@@ -32,12 +32,16 @@ function update(data)::Bool
     data.last = now
 
     # Movement
+    # @TODO: set the cue position to be the mouse position when sliding with left click
     vx = (Input.is_down(SDL_SCANCODE_D) ? 1 : 0) - (Input.is_down(SDL_SCANCODE_A) ? 1 : 0)
     vy = (Input.is_down(SDL_SCANCODE_S) ? 1 : 0) - (Input.is_down(SDL_SCANCODE_W) ? 1 : 0)
 
+    # @TODO: newtonian mechanics
+
+    # @TODO: track selected ball, allow the user to select the tracking method
+
     # Normalization
     len = sqrt(vx^2 + vy^2)
-
     if len > 0
         vx /= len
         vy /= len

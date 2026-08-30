@@ -19,6 +19,7 @@ end
 
 function render(data)
     SDL_SetRenderDrawColor(data.renderer, 255, 255, 255, 255)
+    # @OPTIMIZATION: is there a better way to instantiate this rectangle?
     rect = Ref(SDL_Rect(
         round(Int, data.x),
         round(Int, data.y),

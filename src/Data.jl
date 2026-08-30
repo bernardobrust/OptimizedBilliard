@@ -3,6 +3,10 @@ module Data
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
+# @TODO: add cue and balls to the plex as structs
+# @TODO: define the arrays of positions
+# @TODO: generate the positions and speeds randomly with blue noise
+
 mutable struct DataPlex
     # Delta Time
     last
@@ -25,6 +29,7 @@ mutable struct DataPlex
     renderer
 end
 
+# @TODO: move the default values out
 function DataPlex(;
     last,
     freq,
