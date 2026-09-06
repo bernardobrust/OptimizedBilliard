@@ -6,7 +6,6 @@ using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
 function update(data)::Bool
-    # Event handling
     event_ref = Ref{SDL_Event}()
     while Bool(SDL_PollEvent(event_ref))
         evt = event_ref[]
@@ -15,46 +14,172 @@ function update(data)::Bool
             return false
 
         elseif evt.type == SDL_KEYDOWN
-            sc = evt.key.keysym.scancode
-            Input.handle_input(true, sc)
+            Input.handle_key(true, evt.key.keysym.scancode)
 
         elseif evt.type == SDL_KEYUP
-            sc = evt.key.keysym.scancode
-            Input.handle_input(false, sc)
+            Input.handle_key(false, evt.key.keysym.scancode)
+
+        elseif evt.type == SDL_MOUSEBUTTONDOWN
+            Input.handle_mouse_button(true, evt.button.button, evt.button.x, evt.button.y)
+
+        elseif evt.type == SDL_MOUSEBUTTONUP
+            Input.handle_mouse_button(false, evt.button.button, evt.button.x, evt.button.y)
+
+        elseif evt.type == SDL_MOUSEMOTION
+            Input.handle_mouse_motion(evt.motion.x, evt.motion.y)
         end
     end
 
-    Input.is_down(SDL_SCANCODE_ESCAPE) && (return false)
+    Input.is_down(SDL_SCANCODE_ESCAPE) && return false
 
-    # Timing
     now = SDL_GetPerformanceCounter()
-    dt = (now - data.last) / data.freq
+    dt = Float32((now - data.last) / data.freq)
     data.last = now
+    dt = min(dt, 0.05f0)
 
-    # Movement
-    # @TODO: set the cue position to be the mouse position when sliding with left click
-    vx = (Input.is_down(SDL_SCANCODE_D) ? 1 : 0) - (Input.is_down(SDL_SCANCODE_A) ? 1 : 0)
-    vy = (Input.is_down(SDL_SCANCODE_S) ? 1 : 0) - (Input.is_down(SDL_SCANCODE_W) ? 1 : 0)
+    rad = data.ball_radius
+    max_x = data.bound_x - rad
+    max_y = data.bound_y - rad
 
-    # @TODO: newtonian mechanics
+    # Ball motion and wall reflection
+    @inbounds for i in 1:data.num_balls
+        x = data.ball_x[i] + data.ball_vx[i] * dt
+        y = data.ball_y[i] + data.ball_vy[i] * dt
+        vx = data.ball_vx[i]
+        vy = data.ball_vy[i]
 
-    # @TODO: track selected ball, allow the user to select the tracking method
+        if x < rad
+            x = rad
+            vx = -vx
+        elseif x > max_x
+            x = max_x
+            vx = -vx
+        end
 
-    # Normalization
-    len = sqrt(vx^2 + vy^2)
-    if len > 0
-        vx /= len
-        vy /= len
+        if y < rad
+            y = rad
+            vy = -vy
+        elseif y > max_y
+            y = max_y
+            vy = -vy
+        end
+
+        data.ball_x[i] = x
+        data.ball_y[i] = y
+        data.ball_vx[i] = vx
+        data.ball_vy[i] = vy
     end
 
-    data.x += vx * data.speed * dt
-    data.y += vy * data.speed * dt
+    # Pairwise elastic collisions
+    min_dist = 2.0f0 * rad
+    min_dist_sq = min_dist * min_dist
 
-    # Edge bounds
-    data.x = clamp(data.x, 0, data.bound_x - data.w)
-    data.y = clamp(data.y, 0, data.bound_y - data.h)
+    @inbounds for i in 1:(data.num_balls - 1)
+        x1 = data.ball_x[i]
+        y1 = data.ball_y[i]
+        vx1 = data.ball_vx[i]
+        vy1 = data.ball_vy[i]
 
-    # Keep updating
+        for j in (i + 1):data.num_balls
+            x2 = data.ball_x[j]
+            y2 = data.ball_y[j]
+            dx = x2 - x1
+            dy = y2 - y1
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq < min_dist_sq
+                dist = sqrt(dist_sq)
+                if dist == 0.0f0
+                    nx = 1.0f0
+                    ny = 0.0f0
+                else
+                    inv_dist = 1.0f0 / dist
+                    nx = dx * inv_dist
+                    ny = dy * inv_dist
+                end
+
+                overlap = 0.5f0 * (min_dist - dist)
+                x1 -= nx * overlap
+                y1 -= ny * overlap
+                data.ball_x[j] = x2 + nx * overlap
+                data.ball_y[j] = y2 + ny * overlap
+
+                vx2 = data.ball_vx[j]
+                vy2 = data.ball_vy[j]
+                rel_speed = (vx1 - vx2) * nx + (vy1 - vy2) * ny
+                if rel_speed > 0.0f0
+                    vx1 -= rel_speed * nx
+                    vy1 -= rel_speed * ny
+                    data.ball_vx[j] = vx2 + rel_speed * nx
+                    data.ball_vy[j] = vy2 + rel_speed * ny
+                end
+            end
+        end
+
+        data.ball_x[i] = x1
+        data.ball_y[i] = y1
+        data.ball_vx[i] = vx1
+        data.ball_vy[i] = vy1
+    end
+
+    # Cue interaction and ball targeting
+    mx = Input.mouse_x()
+    my = Input.mouse_y()
+
+    # @TODO: follow a specific point in the circle, not just the center
+    # @TODO: Raycast from cue to ball, and check if any other balls are in the way
+    if Input.mouse_left_pressed()
+        clicked_ball_id = Int32(0)
+        rad_sq = rad * rad
+        @inbounds for i in 1:data.num_balls
+            dx = mx - data.ball_x[i]
+            dy = my - data.ball_y[i]
+            if dx * dx + dy * dy <= rad_sq
+                clicked_ball_id = Int32(i)
+                break
+            end
+        end
+
+        if clicked_ball_id != 0
+            data.selected_ball_id = clicked_ball_id
+            bx = data.ball_x[clicked_ball_id]
+            by = data.ball_y[clicked_ball_id]
+            data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+        end
+
+        # Drag check for rotated cue rectangle
+        rad_angle = deg2rad(-data.cue_angle)
+        cos_a = cos(rad_angle)
+        sin_a = sin(rad_angle)
+        dx = mx - data.cue_x
+        dy = my - data.cue_y
+        local_x = dx * cos_a - dy * sin_a + data.cue_w * 0.5f0
+        local_y = dx * sin_a + dy * cos_a + data.cue_h * 0.5f0
+
+        if local_x >= 0.0f0 && local_x <= data.cue_w && local_y >= 0.0f0 && local_y <= data.cue_h
+            data.dragging_cue = true
+            data.drag_offset_x = mx - data.cue_x
+            data.drag_offset_y = my - data.cue_y
+        end
+    elseif data.selected_ball_id != 0
+        bx = data.ball_x[data.selected_ball_id]
+        by = data.ball_y[data.selected_ball_id]
+        data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+    end
+
+    if !Input.mouse_left_down()
+        data.dragging_cue = false
+    elseif data.dragging_cue
+        data.cue_x = mx - data.drag_offset_x
+        data.cue_y = my - data.drag_offset_y
+        if data.selected_ball_id != 0
+            bx = data.ball_x[data.selected_ball_id]
+            by = data.ball_y[data.selected_ball_id]
+            data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+        end
+    end
+
+    Input.end_frame()
     true
 end
 
