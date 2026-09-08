@@ -5,6 +5,45 @@ include("Input.jl")
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
+# GEOMETRIC INTERPRETATION OF BALL CONTACT POINT TRACKING AND CUE AIMING
+# =============================================================================
+# Coordinate Spaces and Kinematics:
+# - World/Screen Space: R2 coordinate frame with origin at the top-left,
+#   +X pointing right, and +Y pointing down.
+# - Ball Rigid Body: Ball i has radius R and center of mass C_i(t) = (ball_x[i], ball_y[i]).
+# - Contact Point at Click Time t0:
+#   When a user clicks at mouse position M = (mx, my) within the disk ||M - C_i(t0)||_2 ≤ R,
+#   we parameterize the contact point in the ball's body-fixed local reference frame:
+#       r_offset = M - C_i(t0) = (track_offset_x, track_offset_y)
+#   Because the ball undergoes purely translational Newtonian motion without
+#   rotational torque (no spin ω), the body-fixed basis does not rotate relative
+#   to the world frame. Therefore, r_offset remains constant over time.
+# - Dynamic Contact Point at Time t:
+#   By affine vector translation:
+#       P_track(t) = C_i(t) + r_offset
+#                  = (ball_x[i](t) + track_offset_x, ball_y[i](t) + track_offset_y)
+#
+# Sightline Vector and Cue Orientation:
+# - Cue Position: Let Q = (cue_x, cue_y) be the center/pivot of the cue stick.
+# - Sightline Vector: The ray connecting the cue pivot to the target contact point is:
+#       V(t) = P_track(t) - Q = (P_track_x - cue_x, P_track_y - cue_y)
+# - Direction Angle: In R2, the polar azimuth angle of V(t) relative to the +X axis is:
+#       θ = atan2(V_y, V_x) = atan(V_y, V_x) [in radians]
+# - SDL Orientation Alignment:
+#   The cue sprite texture is unrotated at angle 0°, where its length extends along
+#   the +Y axis (downward, i.e., +90° in standard polar coords).
+#   To rotate the cue so that its tip aims directly along V(t) toward P_track(t):
+#       cue_angle = rad2deg(θ) - 90°
+# =============================================================================
+@inline function aim_cue!(data, sid::Int32)
+    # P_track(t) = C(t) + r_offset
+    tx = data.ball_x[sid] + data.track_offset_x
+    ty = data.ball_y[sid] + data.track_offset_y
+
+    # V = P_track(t) - Q, θ = atan2(V_y, V_x), cue_angle = θ - 90°
+    data.cue_angle = rad2deg(atan(ty - data.cue_y, tx - data.cue_x)) - 90.0f0
+end
+
 function update(data)::Bool
     event_ref = Ref{SDL_Event}()
     while Bool(SDL_PollEvent(event_ref))
@@ -56,7 +95,6 @@ function update(data)::Bool
     mx = Input.mouse_x()
     my = Input.mouse_y()
 
-    # @TODO: follow a specific point in the circle, not just the center
     # @TODO: Raycast from cue to ball, and check if any other balls are in the way
     if Input.mouse_left_pressed()
         clicked_ball_id = Int32(0)
@@ -72,9 +110,12 @@ function update(data)::Bool
 
         if clicked_ball_id != 0
             data.selected_ball_id = clicked_ball_id
-            bx = data.ball_x[clicked_ball_id]
-            by = data.ball_y[clicked_ball_id]
-            data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+            # Geometric interpretation:
+            # Store the local displacement vector from the ball center to the clicked point:
+            #   r_offset = M - C = (mx - ball_x[id], my - ball_y[id])
+            data.track_offset_x = mx - data.ball_x[clicked_ball_id]
+            data.track_offset_y = my - data.ball_y[clicked_ball_id]
+            aim_cue!(data, clicked_ball_id)
         end
 
         # Drag check for rotated cue rectangle
@@ -92,9 +133,7 @@ function update(data)::Bool
             data.drag_offset_y = my - data.cue_y
         end
     elseif data.selected_ball_id != 0
-        bx = data.ball_x[data.selected_ball_id]
-        by = data.ball_y[data.selected_ball_id]
-        data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+        aim_cue!(data, data.selected_ball_id)
     end
 
     if !Input.mouse_left_down()
@@ -103,9 +142,7 @@ function update(data)::Bool
         data.cue_x = mx - data.drag_offset_x
         data.cue_y = my - data.drag_offset_y
         if data.selected_ball_id != 0
-            bx = data.ball_x[data.selected_ball_id]
-            by = data.ball_y[data.selected_ball_id]
-            data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
+            aim_cue!(data, data.selected_ball_id)
         end
     end
 
@@ -191,6 +228,14 @@ function update(data)::Bool
         data.ball_y[i] = y1
         data.ball_vx[i] = vx1
         data.ball_vy[i] = vy1
+    end
+
+    # Geometric interpretation (Post-integration re-alignment):
+    # Ball positions have updated during this physics step (integration + collisions).
+    # Re-evaluating aim_cue! here eliminates any 1-frame latency between the moving ball's
+    # tracked contact point and the cue orientation before rendering.
+    if !data.paused && data.selected_ball_id != 0
+        aim_cue!(data, data.selected_ball_id)
     end
 
     Input.end_frame()

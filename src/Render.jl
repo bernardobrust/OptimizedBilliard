@@ -70,6 +70,26 @@ function render(data)
         draw_circle(data.renderer, round(Int32, data.ball_x[i]), round(Int32, data.ball_y[i]), r)
     end
 
+    # Tracking indicator for the exact point on the selected ball
+    if data.selected_ball_id != 0
+        sid = data.selected_ball_id
+        # Exact world coordinates of the tracked contact point on the ball
+        tx = round(Int32, data.ball_x[sid] + data.track_offset_x)
+        ty = round(Int32, data.ball_y[sid] + data.track_offset_y)
+
+        # Line of sight from cue center to the exact tracked point
+        SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 160)
+        SDL_RenderDrawLine(data.renderer, round(Int32, data.cue_x), round(Int32, data.cue_y), tx, ty)
+
+        # Reticle indicator at the exact tracked point on the ball
+        SDL_SetRenderDrawColor(data.renderer, 255, 255, 255, 255)
+        SDL_RenderDrawLine(data.renderer, tx - 3, ty, tx + 3, ty)
+        SDL_RenderDrawLine(data.renderer, tx, ty - 3, tx, ty + 3)
+        
+        SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 255)
+        SDL_RenderDrawPoint(data.renderer, tx, ty)
+    end
+
     SDL_RenderPresent(data.renderer)
 end
 
