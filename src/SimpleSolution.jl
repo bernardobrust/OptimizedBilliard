@@ -1,4 +1,5 @@
 # Simple solution for cue aiming in a billiards game, based on tracking the contact point on the ball.
+# @TODO: Export first collision point of the line of sight (LOS) from cue to ball, and check if any other balls are in the way.
 
 # GEOMETRIC INTERPRETATION OF BALL CONTACT POINT TRACKING AND CUE AIMING
 # =============================================================================

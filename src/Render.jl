@@ -71,6 +71,7 @@ function render(data)
     end
 
     # Tracking indicator for the exact point on the selected ball
+    # @TODO: This line does not stop if it intersects with another one on the way, we should have the solution export the first colision point of the LOS
     if data.selected_ball_id != 0
         sid = data.selected_ball_id
         # Exact world coordinates of the tracked contact point on the ball
@@ -85,7 +86,7 @@ function render(data)
         SDL_SetRenderDrawColor(data.renderer, 255, 255, 255, 255)
         SDL_RenderDrawLine(data.renderer, tx - 3, ty, tx + 3, ty)
         SDL_RenderDrawLine(data.renderer, tx, ty - 3, tx, ty + 3)
-        
+
         SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 255)
         SDL_RenderDrawPoint(data.renderer, tx, ty)
     end
