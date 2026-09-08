@@ -71,24 +71,35 @@ function render(data)
     end
 
     # Tracking indicator for the exact point on the selected ball
-    # @TODO: This line does not stop if it intersects with another one on the way, we should have the solution export the first colision point of the LOS
     if data.selected_ball_id != 0
         sid = data.selected_ball_id
-        # Exact world coordinates of the tracked contact point on the ball
+        # Exact world coordinates of the tracked contact point on the target ball
         tx = round(Int32, data.ball_x[sid] + data.track_offset_x)
         ty = round(Int32, data.ball_y[sid] + data.track_offset_y)
 
-        # Line of sight from cue center to the exact tracked point
-        SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 160)
-        SDL_RenderDrawLine(data.renderer, round(Int32, data.cue_x), round(Int32, data.cue_y), tx, ty)
+        # First collision point of the LOS (exported by the solution)
+        cx = round(Int32, data.collision_x)
+        cy = round(Int32, data.collision_y)
 
-        # Reticle indicator at the exact tracked point on the ball
+        # LOS from cue center to the first collision point (stops at blocking ball)
+        SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 160)
+        SDL_RenderDrawLine(data.renderer, round(Int32, data.cue_x), round(Int32, data.cue_y), cx, cy)
+
+        # Reticle indicator at the exact tracked point on the target ball
         SDL_SetRenderDrawColor(data.renderer, 255, 255, 255, 255)
         SDL_RenderDrawLine(data.renderer, tx - 3, ty, tx + 3, ty)
         SDL_RenderDrawLine(data.renderer, tx, ty - 3, tx, ty + 3)
 
         SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 255)
         SDL_RenderDrawPoint(data.renderer, tx, ty)
+
+        # If LOS is blocked before reaching the target, draw a collision impact indicator
+        if (data.collision_x - (data.ball_x[sid] + data.track_offset_x))^2 +
+           (data.collision_y - (data.ball_y[sid] + data.track_offset_y))^2 > 1.0f0
+            SDL_SetRenderDrawColor(data.renderer, 0, 255, 0, 255)
+            SDL_RenderDrawLine(data.renderer, cx - 2, cy, cx + 2, cy)
+            SDL_RenderDrawLine(data.renderer, cx, cy - 2, cx, cy + 2)
+        end
     end
 
     SDL_RenderPresent(data.renderer)

@@ -33,6 +33,8 @@ mutable struct DataPlex
     selected_ball_id::Int32
     track_offset_x::Float32
     track_offset_y::Float32
+    collision_x::Float32
+    collision_y::Float32
 
     # Renderer & Resources
     win::Ptr{SDL_Window}
@@ -94,6 +96,8 @@ function init_data(
         0.0f0,
         0.0f0,
         Int32(0),
+        0.0f0,
+        0.0f0,
         0.0f0,
         0.0f0,
         win,

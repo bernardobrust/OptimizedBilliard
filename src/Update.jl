@@ -59,7 +59,6 @@ function update(data)::Bool
     mx = Input.mouse_x()
     my = Input.mouse_y()
 
-    # @TODO: Raycast from cue to ball, and check if any other balls are in the way
     if Input.mouse_left_pressed()
         clicked_ball_id = Int32(0)
         rad_sq = rad * rad
