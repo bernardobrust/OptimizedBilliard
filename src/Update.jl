@@ -13,8 +13,13 @@ function update(data)::Bool
         if evt.type == SDL_QUIT
             return false
 
+        # Workoround for reated space keys
         elseif evt.type == SDL_KEYDOWN
-            Input.handle_key(true, evt.key.keysym.scancode)
+            if evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.key.repeat == 0
+                data.paused = !data.paused
+            else
+                Input.handle_key(true, evt.key.keysym.scancode)
+            end
 
         elseif evt.type == SDL_KEYUP
             Input.handle_key(false, evt.key.keysym.scancode)
@@ -30,8 +35,6 @@ function update(data)::Bool
         end
     end
 
-    Input.is_down(SDL_SCANCODE_ESCAPE) && return false
-
     now = SDL_GetPerformanceCounter()
     dt = Float32((now - data.last) / data.freq)
     data.last = now
@@ -41,86 +44,13 @@ function update(data)::Bool
     max_x = data.bound_x - rad
     max_y = data.bound_y - rad
 
-    # Ball motion and wall reflection
-    @inbounds for i in 1:data.num_balls
-        x = data.ball_x[i] + data.ball_vx[i] * dt
-        y = data.ball_y[i] + data.ball_vy[i] * dt
-        vx = data.ball_vx[i]
-        vy = data.ball_vy[i]
+    # Quit
+    Input.is_down(SDL_SCANCODE_ESCAPE) && return false
 
-        if x < rad
-            x = rad
-            vx = -vx
-        elseif x > max_x
-            x = max_x
-            vx = -vx
-        end
+    # Pause
+    Input.is_down(SDL_SCANCODE_SPACE) && (data.paused = !data.paused)
 
-        if y < rad
-            y = rad
-            vy = -vy
-        elseif y > max_y
-            y = max_y
-            vy = -vy
-        end
-
-        data.ball_x[i] = x
-        data.ball_y[i] = y
-        data.ball_vx[i] = vx
-        data.ball_vy[i] = vy
-    end
-
-    # Pairwise elastic collisions
-    min_dist = 2.0f0 * rad
-    min_dist_sq = min_dist * min_dist
-
-    @inbounds for i in 1:(data.num_balls - 1)
-        x1 = data.ball_x[i]
-        y1 = data.ball_y[i]
-        vx1 = data.ball_vx[i]
-        vy1 = data.ball_vy[i]
-
-        for j in (i + 1):data.num_balls
-            x2 = data.ball_x[j]
-            y2 = data.ball_y[j]
-            dx = x2 - x1
-            dy = y2 - y1
-            dist_sq = dx * dx + dy * dy
-
-            if dist_sq < min_dist_sq
-                dist = sqrt(dist_sq)
-                if dist == 0.0f0
-                    nx = 1.0f0
-                    ny = 0.0f0
-                else
-                    inv_dist = 1.0f0 / dist
-                    nx = dx * inv_dist
-                    ny = dy * inv_dist
-                end
-
-                overlap = 0.5f0 * (min_dist - dist)
-                x1 -= nx * overlap
-                y1 -= ny * overlap
-                data.ball_x[j] = x2 + nx * overlap
-                data.ball_y[j] = y2 + ny * overlap
-
-                vx2 = data.ball_vx[j]
-                vy2 = data.ball_vy[j]
-                rel_speed = (vx1 - vx2) * nx + (vy1 - vy2) * ny
-                if rel_speed > 0.0f0
-                    vx1 -= rel_speed * nx
-                    vy1 -= rel_speed * ny
-                    data.ball_vx[j] = vx2 + rel_speed * nx
-                    data.ball_vy[j] = vy2 + rel_speed * ny
-                end
-            end
-        end
-
-        data.ball_x[i] = x1
-        data.ball_y[i] = y1
-        data.ball_vx[i] = vx1
-        data.ball_vy[i] = vy1
-    end
+    # We need this interaction to happen even if the game is paused
 
     # Cue interaction and ball targeting
     mx = Input.mouse_x()
@@ -177,6 +107,90 @@ function update(data)::Bool
             by = data.ball_y[data.selected_ball_id]
             data.cue_angle = rad2deg(atan(by - data.cue_y, bx - data.cue_x)) - 90.0f0
         end
+    end
+
+    # Do not run code after this if the game is paused
+    data.paused && (Input.end_frame(); return true)
+
+    # Ball motion and wall reflection
+    @inbounds for i in 1:data.num_balls
+        x = data.ball_x[i] + data.ball_vx[i] * dt
+        y = data.ball_y[i] + data.ball_vy[i] * dt
+        vx = data.ball_vx[i]
+        vy = data.ball_vy[i]
+
+        if x < rad
+            x = rad
+            vx = -vx
+        elseif x > max_x
+            x = max_x
+            vx = -vx
+        end
+
+        if y < rad
+            y = rad
+            vy = -vy
+        elseif y > max_y
+            y = max_y
+            vy = -vy
+        end
+
+        data.ball_x[i] = x
+        data.ball_y[i] = y
+        data.ball_vx[i] = vx
+        data.ball_vy[i] = vy
+    end
+
+    # Pairwise elastic collisions
+    min_dist = 2.0f0 * rad
+    min_dist_sq = min_dist * min_dist
+
+    @inbounds for i in 1:(data.num_balls-1)
+        x1 = data.ball_x[i]
+        y1 = data.ball_y[i]
+        vx1 = data.ball_vx[i]
+        vy1 = data.ball_vy[i]
+
+        for j in (i+1):data.num_balls
+            x2 = data.ball_x[j]
+            y2 = data.ball_y[j]
+            dx = x2 - x1
+            dy = y2 - y1
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq < min_dist_sq
+                dist = sqrt(dist_sq)
+                if dist == 0.0f0
+                    nx = 1.0f0
+                    ny = 0.0f0
+                else
+                    inv_dist = 1.0f0 / dist
+                    nx = dx * inv_dist
+                    ny = dy * inv_dist
+                end
+
+                overlap = 0.5f0 * (min_dist - dist)
+                x1 -= nx * overlap
+                y1 -= ny * overlap
+                data.ball_x[j] = x2 + nx * overlap
+                data.ball_y[j] = y2 + ny * overlap
+
+                vx2 = data.ball_vx[j]
+                vy2 = data.ball_vy[j]
+                rel_speed = (vx1 - vx2) * nx + (vy1 - vy2) * ny
+                if rel_speed > 0.0f0
+                    vx1 -= rel_speed * nx
+                    vy1 -= rel_speed * ny
+                    data.ball_vx[j] = vx2 + rel_speed * nx
+                    data.ball_vy[j] = vy2 + rel_speed * ny
+                end
+            end
+        end
+
+        data.ball_x[i] = x1
+        data.ball_y[i] = y1
+        data.ball_vx[i] = vx1
+        data.ball_vy[i] = vy1
     end
 
     Input.end_frame()

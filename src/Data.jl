@@ -36,6 +36,9 @@ mutable struct DataPlex
     win::Ptr{SDL_Window}
     renderer::Ptr{SDL_Renderer}
     cue_texture::Ptr{SDL_Texture}
+
+    # Pause system
+    paused::Bool
 end
 
 function init_data(
@@ -91,7 +94,8 @@ function init_data(
         Int32(0),
         win,
         renderer,
-        cue_texture
+        cue_texture,
+        false
     )
 end
 
