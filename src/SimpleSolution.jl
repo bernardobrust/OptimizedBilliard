@@ -57,6 +57,7 @@
     qx = data.cue_x
     qy = data.cue_y
 
+    # Aiming at arbitrary direction
     if sid == 0
         !data.has_aim && return
         ux = data.aim_dir_x
@@ -80,6 +81,7 @@
         t_min = t_bound
         hit_x = qx + t_bound * ux
         hit_y = qy + t_bound * uy
+    # Aiming at ball
     else
         tx = data.ball_x[sid] + data.track_offset_x
         ty = data.ball_y[sid] + data.track_offset_y
@@ -111,6 +113,7 @@
     rad = data.ball_radius
     rad_sq = rad * rad
 
+    # Raycasting hit
     @inbounds for j in 1:data.num_balls
         j == sid && continue
 

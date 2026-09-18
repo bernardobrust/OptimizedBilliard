@@ -38,6 +38,7 @@ function update(data)::Bool
         end
     end
 
+    # @TODO: Fps counter to compare solutions
     now = SDL_GetPerformanceCounter()
     dt = Float32((now - data.last) / data.freq)
     data.last = now
@@ -69,10 +70,12 @@ function update(data)::Bool
         local_x = dx * cos_a - dy * sin_a + data.cue_w * 0.5f0
         local_y = dx * sin_a + dy * cos_a + data.cue_h * 0.5f0
 
+        # Cue dragging
         if local_x >= 0.0f0 && local_x <= data.cue_w && local_y >= 0.0f0 && local_y <= data.cue_h
             data.dragging_cue = true
             data.drag_offset_x = mx - data.cue_x
             data.drag_offset_y = my - data.cue_y
+            # Aim
         else
             clicked_ball_id = Int32(0)
             rad_sq = rad * rad
@@ -85,6 +88,7 @@ function update(data)::Bool
                 end
             end
 
+            # Start tracking ball
             if clicked_ball_id != 0
                 data.selected_ball_id = clicked_ball_id
                 data.track_offset_x = mx - data.ball_x[clicked_ball_id]
@@ -93,7 +97,9 @@ function update(data)::Bool
                 data.target_y = my
                 data.has_aim = true
                 aim_cue!(data, clicked_ball_id)
-            else # Fixed direction clicked in empty space
+
+                # Fixed direction clicked in empty space
+            else
                 cdx = mx - data.cue_x
                 cdy = my - data.cue_y
                 cdist = sqrt(cdx * cdx + cdy * cdy)
