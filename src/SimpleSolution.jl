@@ -52,10 +52,19 @@
 #          P_collision = P_track(t)
 # - The resulting (collision_x, collision_y) is exported to data for rendering.
 # =============================================================================
+
+include("Input.jl")
+
 @inline function aim_cue!(data, sid::Int32)
+    # sid = -1 if not tracking
     # Target contact point: P_track(t) = C(t) + r_offset
-    tx = data.ball_x[sid] + data.track_offset_x
-    ty = data.ball_y[sid] + data.track_offset_y
+    if sid == 0
+        tx = Input.mouse_x()
+        ty = Input.mouse_y()
+    else
+        tx = data.ball_x[sid] + data.track_offset_x
+        ty = data.ball_y[sid] + data.track_offset_y
+    end
 
     qx = data.cue_x
     qy = data.cue_y

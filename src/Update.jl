@@ -79,6 +79,11 @@ function update(data)::Bool
             data.track_offset_x = mx - data.ball_x[clicked_ball_id]
             data.track_offset_y = my - data.ball_y[clicked_ball_id]
             aim_cue!(data, clicked_ball_id)
+        else # Arbitrary angle
+            data.track_offset_x = 0
+            data.track_offset_y = 0
+            data.selected_ball_id = Int32(0)
+            aim_cue!(data, Int32(0))
         end
 
         # Drag check for rotated cue rectangle
