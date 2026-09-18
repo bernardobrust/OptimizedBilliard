@@ -16,7 +16,7 @@ function update(data)::Bool
         if evt.type == SDL_QUIT
             return false
 
-        # Workoround for reated space keys
+            # Workoround for reated space keys
         elseif evt.type == SDL_KEYDOWN
             if evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.key.repeat == 0
                 data.paused = !data.paused
@@ -60,32 +60,6 @@ function update(data)::Bool
     my = Input.mouse_y()
 
     if Input.mouse_left_pressed()
-        clicked_ball_id = Int32(0)
-        rad_sq = rad * rad
-        @inbounds for i in 1:data.num_balls
-            dx = mx - data.ball_x[i]
-            dy = my - data.ball_y[i]
-            if dx * dx + dy * dy <= rad_sq
-                clicked_ball_id = Int32(i)
-                break
-            end
-        end
-
-        if clicked_ball_id != 0
-            data.selected_ball_id = clicked_ball_id
-            # Geometric interpretation:
-            # Store the local displacement vector from the ball center to the clicked point:
-            #   r_offset = M - C = (mx - ball_x[id], my - ball_y[id])
-            data.track_offset_x = mx - data.ball_x[clicked_ball_id]
-            data.track_offset_y = my - data.ball_y[clicked_ball_id]
-            aim_cue!(data, clicked_ball_id)
-        else # Arbitrary angle
-            data.track_offset_x = 0
-            data.track_offset_y = 0
-            data.selected_ball_id = Int32(0)
-            aim_cue!(data, Int32(0))
-        end
-
         # Drag check for rotated cue rectangle
         rad_angle = deg2rad(-data.cue_angle)
         cos_a = cos(rad_angle)
@@ -99,8 +73,44 @@ function update(data)::Bool
             data.dragging_cue = true
             data.drag_offset_x = mx - data.cue_x
             data.drag_offset_y = my - data.cue_y
+        else
+            clicked_ball_id = Int32(0)
+            rad_sq = rad * rad
+            @inbounds for i in 1:data.num_balls
+                bx = mx - data.ball_x[i]
+                by = my - data.ball_y[i]
+                if bx * bx + by * by <= rad_sq
+                    clicked_ball_id = Int32(i)
+                    break
+                end
+            end
+
+            if clicked_ball_id != 0
+                data.selected_ball_id = clicked_ball_id
+                data.track_offset_x = mx - data.ball_x[clicked_ball_id]
+                data.track_offset_y = my - data.ball_y[clicked_ball_id]
+                data.target_x = mx
+                data.target_y = my
+                data.has_aim = true
+                aim_cue!(data, clicked_ball_id)
+            else # Fixed direction clicked in empty space
+                cdx = mx - data.cue_x
+                cdy = my - data.cue_y
+                cdist = sqrt(cdx * cdx + cdy * cdy)
+                if cdist > 1.0f-6
+                    data.aim_dir_x = cdx / cdist
+                    data.aim_dir_y = cdy / cdist
+                    data.target_x = mx
+                    data.target_y = my
+                    data.track_offset_x = 0.0f0
+                    data.track_offset_y = 0.0f0
+                    data.selected_ball_id = Int32(0)
+                    data.has_aim = true
+                    aim_cue!(data, Int32(0))
+                end
+            end
         end
-    elseif data.selected_ball_id != 0
+    elseif data.selected_ball_id != 0 || data.has_aim
         aim_cue!(data, data.selected_ball_id)
     end
 
@@ -109,7 +119,7 @@ function update(data)::Bool
     elseif data.dragging_cue
         data.cue_x = mx - data.drag_offset_x
         data.cue_y = my - data.drag_offset_y
-        if data.selected_ball_id != 0
+        if data.selected_ball_id != 0 || data.has_aim
             aim_cue!(data, data.selected_ball_id)
         end
     end
@@ -202,7 +212,7 @@ function update(data)::Bool
     # Ball positions have updated during this physics step (integration + collisions).
     # Re-evaluating aim_cue! here eliminates any 1-frame latency between the moving ball's
     # tracked contact point and the cue orientation before rendering.
-    if !data.paused && data.selected_ball_id != 0
+    if !data.paused && (data.selected_ball_id != 0 || data.has_aim)
         aim_cue!(data, data.selected_ball_id)
     end
 

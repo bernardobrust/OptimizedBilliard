@@ -53,44 +53,60 @@
 # - The resulting (collision_x, collision_y) is exported to data for rendering.
 # =============================================================================
 
-include("Input.jl")
-
 @inline function aim_cue!(data, sid::Int32)
-    # sid = -1 if not tracking
-    # Target contact point: P_track(t) = C(t) + r_offset
-    if sid == 0
-        tx = Input.mouse_x()
-        ty = Input.mouse_y()
-    else
-        tx = data.ball_x[sid] + data.track_offset_x
-        ty = data.ball_y[sid] + data.track_offset_y
-    end
-
     qx = data.cue_x
     qy = data.cue_y
 
-    dx = tx - qx
-    dy = ty - qy
+    if sid == 0
+        !data.has_aim && return
+        ux = data.aim_dir_x
+        uy = data.aim_dir_y
 
-    # V = P_track(t) - Q, θ = atan2(V_y, V_x), cue_angle = θ - 90°
-    data.cue_angle = rad2deg(atan(dy, dx)) - 90.0f0
+        data.cue_angle = rad2deg(atan(uy, ux)) - 90.0f0
 
-    # Line-circle intersection for LOS
-    dist_sq = dx * dx + dy * dy
-    if dist_sq <= 1.0f-6
-        data.collision_x = tx
-        data.collision_y = ty
-        return
+        # When aiming fixed in a direction, the ray extends to the table boundary
+        t_bound = Float32(1e6)
+        if ux > 1.0f-6
+            t_bound = min(t_bound, (data.bound_x - qx) / ux)
+        elseif ux < -1.0f-6
+            t_bound = min(t_bound, -qx / ux)
+        end
+        if uy > 1.0f-6
+            t_bound = min(t_bound, (data.bound_y - qy) / uy)
+        elseif uy < -1.0f-6
+            t_bound = min(t_bound, -qy / uy)
+        end
+
+        t_min = t_bound
+        hit_x = qx + t_bound * ux
+        hit_y = qy + t_bound * uy
+    else
+        tx = data.ball_x[sid] + data.track_offset_x
+        ty = data.ball_y[sid] + data.track_offset_y
+
+        dx = tx - qx
+        dy = ty - qy
+
+        # V = P_track(t) - Q, θ = atan2(V_y, V_x), cue_angle = θ - 90°
+        data.cue_angle = rad2deg(atan(dy, dx)) - 90.0f0
+
+        # Line-circle intersection for LOS
+        dist_sq = dx * dx + dy * dy
+        if dist_sq <= 1.0f-6
+            data.collision_x = tx
+            data.collision_y = ty
+            return
+        end
+
+        dist = sqrt(dist_sq)
+        inv_dist = 1.0f0 / dist
+        ux = dx * inv_dist
+        uy = dy * inv_dist
+
+        t_min = dist
+        hit_x = tx
+        hit_y = ty
     end
-
-    dist = sqrt(dist_sq)
-    inv_dist = 1.0f0 / dist
-    ux = dx * inv_dist
-    uy = dy * inv_dist
-
-    t_min = dist
-    hit_x = tx
-    hit_y = ty
 
     rad = data.ball_radius
     rad_sq = rad * rad

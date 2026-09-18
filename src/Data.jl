@@ -35,6 +35,11 @@ mutable struct DataPlex
     track_offset_y::Float32
     collision_x::Float32
     collision_y::Float32
+    target_x::Float32
+    target_y::Float32
+    aim_dir_x::Float32
+    aim_dir_y::Float32
+    has_aim::Bool
 
     # Renderer & Resources
     win::Ptr{SDL_Window}
@@ -100,6 +105,11 @@ function init_data(
         0.0f0,
         0.0f0,
         0.0f0,
+        0.0f0,
+        0.0f0,
+        0.0f0,
+        0.0f0,
+        false,
         win,
         renderer,
         cue_texture,

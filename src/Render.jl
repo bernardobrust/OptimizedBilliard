@@ -95,39 +95,27 @@ function render(data)
 
         # If LOS is blocked before reaching the target, draw a collision impact indicator
         if (data.collision_x - (data.ball_x[sid] + data.track_offset_x))^2 +
-           (data.collision_y - (data.ball_y[sid] + data.track_offset_y))^2 > 1.0f0
+            (data.collision_y - (data.ball_y[sid] + data.track_offset_y))^2 > 1.0f0
             SDL_SetRenderDrawColor(data.renderer, 0, 255, 0, 255)
             SDL_RenderDrawLine(data.renderer, cx - 2, cy, cx + 2, cy)
             SDL_RenderDrawLine(data.renderer, cx, cy - 2, cx, cy + 2)
         end
-    else
-        # Exact world coordinates of the tracked contact point on the target ball
-        tx = round(Int32, data.collision_x + data.track_offset_x)
-        ty = round(Int32, data.collision_y + data.track_offset_y)
-
+    elseif data.has_aim
         # First collision point of the LOS (exported by the solution)
         cx = round(Int32, data.collision_x)
         cy = round(Int32, data.collision_y)
 
-        # LOS from cue center to the first collision point (stops at blocking ball)
+        # LOS from cue center to the first collision point (stops at blocking ball or boundary)
         SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 160)
         SDL_RenderDrawLine(data.renderer, round(Int32, data.cue_x), round(Int32, data.cue_y), cx, cy)
 
-        # Reticle indicator at the exact tracked point on the target ball
+        # Reticle indicator at the collision point
         SDL_SetRenderDrawColor(data.renderer, 255, 255, 255, 255)
-        SDL_RenderDrawLine(data.renderer, tx - 3, ty, tx + 3, ty)
-        SDL_RenderDrawLine(data.renderer, tx, ty - 3, tx, ty + 3)
+        SDL_RenderDrawLine(data.renderer, cx - 3, cy, cx + 3, cy)
+        SDL_RenderDrawLine(data.renderer, cx, cy - 3, cx, cy + 3)
 
         SDL_SetRenderDrawColor(data.renderer, 255, 215, 0, 255)
-        SDL_RenderDrawPoint(data.renderer, tx, ty)
-
-        # If LOS is blocked before reaching the target, draw a collision impact indicator
-        if (data.collision_x - (data.collision_x + data.track_offset_x))^2 +
-            (data.collision_y - (data.collision_x + data.track_offset_y))^2 > 1.0f0
-            SDL_SetRenderDrawColor(data.renderer, 0, 255, 0, 255)
-            SDL_RenderDrawLine(data.renderer, cx - 2, cy, cx + 2, cy)
-            SDL_RenderDrawLine(data.renderer, cx, cy - 2, cx, cy + 2)
-        end
+        SDL_RenderDrawPoint(data.renderer, cx, cy)
     end
 
     SDL_RenderPresent(data.renderer)
