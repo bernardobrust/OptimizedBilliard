@@ -114,7 +114,7 @@
     rad_sq = rad * rad
 
     # Raycasting hit
-    @inbounds for j in 1:data.num_balls
+    @inbounds @fastmath for j in 1:data.num_balls
         j == sid && continue
 
         vx = data.ball_x[j] - qx

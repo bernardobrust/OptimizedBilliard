@@ -8,7 +8,7 @@ include("SimpleSolution.jl")
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
-function update(data)::Bool
+@inline function update(data)::Bool
     event_ref = Ref{SDL_Event}()
     while Bool(SDL_PollEvent(event_ref))
         evt = event_ref[]
@@ -134,7 +134,7 @@ function update(data)::Bool
     data.paused && (Input.end_frame(); return true)
 
     # Ball motion and wall reflection
-    @inbounds for i in 1:data.num_balls
+    @inbounds @fastmath @simd for i in 1:data.num_balls
         x = data.ball_x[i] + data.ball_vx[i] * dt
         y = data.ball_y[i] + data.ball_vy[i] * dt
         vx = data.ball_vx[i]
@@ -172,7 +172,7 @@ function update(data)::Bool
         vx1 = data.ball_vx[i]
         vy1 = data.ball_vy[i]
 
-        for j in (i+1):data.num_balls
+        @inbounds @fastmath @simd for j in (i+1):data.num_balls
             x2 = data.ball_x[j]
             y2 = data.ball_y[j]
             dx = x2 - x1

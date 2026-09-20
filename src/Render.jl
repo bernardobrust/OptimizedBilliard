@@ -9,7 +9,7 @@ const CIRCLE_R10_OFFSETS = Int32[
     0, 4, 6, 7, 8, 8, 9, 9, 10, 10, 10, 10, 10, 9, 9, 8, 8, 7, 6, 4, 0
 ]
 
-function init_display(width::Int32, height::Int32)
+@inline function init_display(width::Int32, height::Int32)
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 16)
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16)
 
@@ -29,7 +29,7 @@ end
     end
 end
 
-function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32, r::Int32)
+@inline function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32, r::Int32)
     if r == 10
         draw_circle_r10(renderer, cx, cy)
         return
@@ -41,7 +41,7 @@ function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32, r::Int32
     end
 end
 
-function render(data)
+@inline function render(data)
     SDL_SetRenderDrawColor(data.renderer, 0, 0, 0, 255)
     SDL_RenderClear(data.renderer)
 
@@ -121,7 +121,7 @@ function render(data)
     SDL_RenderPresent(data.renderer)
 end
 
-function close_display(data)
+@inline function close_display(data)
     data.cue_texture != C_NULL && SDL_DestroyTexture(data.cue_texture)
     data.renderer != C_NULL && SDL_DestroyRenderer(data.renderer)
     data.win != C_NULL && SDL_DestroyWindow(data.win)
