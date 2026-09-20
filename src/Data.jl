@@ -48,6 +48,15 @@ mutable struct DataPlex
 
     # Pause system
     paused::Bool
+
+    # Font & FPS Counter
+    font::Ptr{TTF_Font}
+    fps::Float64
+    fps_10s::Float64
+    frame_timestamps::Vector{Float64}
+    frame_head::Int
+    frame_tail::Int
+    frame_capacity::Int
 end
 
 function init_data(
@@ -55,7 +64,8 @@ function init_data(
     win_w::Int32,
     win_h::Int32,
     win::Ptr{SDL_Window},
-    renderer::Ptr{SDL_Renderer}
+    renderer::Ptr{SDL_Renderer},
+    font::Ptr{TTF_Font} = Ptr{TTF_Font}(C_NULL)
 )::DataPlex
     num_balls = Int32(16)
     ball_radius = 10.0f0
@@ -79,6 +89,9 @@ function init_data(
     cue_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, 1, 1)
     pixel = UInt32[0xFFFFFFFF]
     SDL_UpdateTexture(cue_texture, C_NULL, pixel, sizeof(UInt32))
+
+    frame_capacity = 65536
+    frame_timestamps = zeros(Float64, frame_capacity)
 
     DataPlex(
         SDL_GetPerformanceCounter(),
@@ -113,7 +126,14 @@ function init_data(
         win,
         renderer,
         cue_texture,
-        false
+        false,
+        font,
+        0.0,
+        0.0,
+        frame_timestamps,
+        1,
+        1,
+        frame_capacity
     )
 end
 

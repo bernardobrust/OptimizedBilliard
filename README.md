@@ -41,10 +41,8 @@ The original implementation was first sketched in Python. This repository contai
 
 ## Running
 ### Requirements
-- The [Julia Language compiler](https://julialang.org/)
+- The [Julia Language](https://julialang.org/)
 - [SDL2](https://www.libsdl.org/) for [Julia](https://github.com/JuliaMultimedia/SimpleDirectMediaLayer.jl)
-
-> **Note:** By default the renderer uses Vulkan for the backed via the `SDL_WINDOW_VULKAN` window flag. So if the window fails to open, try changing it to `SDL_WINDOW_OPENGL`. We'll try to add CLI-parsing latter so the backend can be passed as an argument.
 
 ### Running
 Julia uses a JIT compiler, so you can just call the compiler against main:

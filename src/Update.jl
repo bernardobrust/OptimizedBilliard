@@ -38,10 +38,39 @@ using SimpleDirectMediaLayer.LibSDL2
         end
     end
 
-    # @TODO: Fps counter to compare solutions
     now = SDL_GetPerformanceCounter()
     dt = Float32((now - data.last) / data.freq)
     data.last = now
+
+    # Calculate Current FPS
+    raw_dt = Float64(dt)
+    if raw_dt > 0.0
+        instant_fps = 1.0 / raw_dt
+        data.fps = data.fps == 0.0 ? instant_fps : (0.95 * data.fps + 0.05 * instant_fps)
+    end
+
+    # Calculate 10-second Amortized FPS
+    curr_time = Float64(now) / Float64(data.freq)
+    data.frame_timestamps[data.frame_tail] = curr_time
+    data.frame_tail = (data.frame_tail % data.frame_capacity) + 1
+    if data.frame_tail == data.frame_head
+        data.frame_head = (data.frame_head % data.frame_capacity) + 1
+    end
+
+    while data.frame_head != data.frame_tail && (curr_time - data.frame_timestamps[data.frame_head]) > 10.0
+        data.frame_head = (data.frame_head % data.frame_capacity) + 1
+    end
+
+    num_frames = (data.frame_tail - data.frame_head + data.frame_capacity) % data.frame_capacity
+    if num_frames > 1
+        time_span = curr_time - data.frame_timestamps[data.frame_head]
+        if time_span > 0.0
+            data.fps_10s = Float64(num_frames - 1) / time_span
+        end
+    else
+        data.fps_10s = data.fps
+    end
+
     dt = min(dt, 0.05f0)
 
     rad = data.ball_radius

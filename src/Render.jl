@@ -10,16 +10,46 @@ const CIRCLE_R10_OFFSETS = Int32[
 ]
 
 @inline function init_display(width::Int32, height::Int32)
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 16)
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16)
-
     @assert SDL_Init(SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL_GetError()))"
+    @assert TTF_Init() == 0 "error initializing TTF: $(unsafe_string(SDL_GetError()))"
 
     win_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
     win = SDL_CreateWindow("Optimized Billiard", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, win_flags)
-    renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
+    renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED)
 
     win, renderer
+end
+
+function load_font(ptsize::Int32 = Int32(16))::Ptr{TTF_Font}
+    candidates = String[]
+    try
+        p = normpath(joinpath(dirname(dirname(pathof(SimpleDirectMediaLayer))), "assets", "fonts", "FiraCode", "ttf", "FiraCode-Regular.ttf"))
+        push!(candidates, p)
+    catch
+    end
+    if Sys.iswindows()
+        windir = get(ENV, "WINDIR", "C:\\Windows")
+        push!(candidates, joinpath(windir, "Fonts", "arial.ttf"))
+        push!(candidates, joinpath(windir, "Fonts", "consola.ttf"))
+        push!(candidates, joinpath(windir, "Fonts", "segoeui.ttf"))
+        push!(candidates, joinpath(windir, "Fonts", "tahoma.ttf"))
+    elseif Sys.isapple()
+        push!(candidates, "/Library/Fonts/Arial.ttf")
+        push!(candidates, "/System/Library/Fonts/SFNSMono.ttf")
+    else
+        push!(candidates, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        push!(candidates, "/usr/share/fonts/TTF/DejaVuSans.ttf")
+    end
+    for path in candidates
+        if isfile(path)
+            font = TTF_OpenFont(path, ptsize)
+            if font != C_NULL
+                return font
+            end
+        end
+    end
+    @warn "No TTF font could be loaded from candidates: $(candidates)"
+    return Ptr{TTF_Font}(C_NULL)
 end
 
 @inline function draw_circle_r10(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
@@ -118,10 +148,74 @@ end
         SDL_RenderDrawPoint(data.renderer, cx, cy)
     end
 
+    # FPS counter in top-right
+    render_fps(data)
+
     SDL_RenderPresent(data.renderer)
 end
 
+@inline function render_fps(data)
+    if data.font == C_NULL
+        data.font = load_font(Int32(16))
+        data.font == C_NULL && return
+    end
+
+    fps_str = "FPS: $(round(Int, data.fps))"
+    fps_10s_str = "10s: $(round(data.fps_10s, digits=1))"
+
+    w_ref = Ref{Cint}(0)
+    h_ref = Ref{Cint}(0)
+    SDL_GetRendererOutputSize(data.renderer, w_ref, h_ref)
+    win_w = w_ref[] > 0 ? w_ref[] : round(Int32, data.bound_x)
+
+    color = SDL_Color(255, 255, 255, 255)
+    margin = Int32(12)
+    spacing = Int32(3)
+
+    surf1 = TTF_RenderText_Blended(data.font, fps_str, color)
+    surf2 = TTF_RenderText_Blended(data.font, fps_10s_str, color)
+
+    surf1 == C_NULL && surf2 == C_NULL && return
+
+    fw1, fh1 = Ref{Cint}(0), Ref{Cint}(0)
+    fw2, fh2 = Ref{Cint}(0), Ref{Cint}(0)
+
+    surf1 != C_NULL && TTF_SizeText(data.font, fps_str, fw1, fh1)
+    surf2 != C_NULL && TTF_SizeText(data.font, fps_10s_str, fw2, fh2)
+
+    max_w = max(fw1[], fw2[])
+    total_h = fh1[] + (surf2 != C_NULL ? fh2[] + spacing : Int32(0))
+
+    pad = Int32(6)
+    bg_rect = Ref(SDL_Rect(win_w - max_w - margin - pad, margin - pad, max_w + 2 * pad, total_h + 2 * pad))
+    SDL_SetRenderDrawBlendMode(data.renderer, SDL_BLENDMODE_BLEND)
+    SDL_SetRenderDrawColor(data.renderer, 0, 0, 0, 160)
+    SDL_RenderFillRect(data.renderer, bg_rect)
+
+    if surf1 != C_NULL
+        tex1 = SDL_CreateTextureFromSurface(data.renderer, surf1)
+        if tex1 != C_NULL
+            dst1 = Ref(SDL_Rect(win_w - fw1[] - margin, margin, fw1[], fh1[]))
+            SDL_RenderCopy(data.renderer, tex1, C_NULL, dst1)
+            SDL_DestroyTexture(tex1)
+        end
+        SDL_FreeSurface(surf1)
+    end
+
+    if surf2 != C_NULL
+        tex2 = SDL_CreateTextureFromSurface(data.renderer, surf2)
+        if tex2 != C_NULL
+            dst2 = Ref(SDL_Rect(win_w - fw2[] - margin, margin + fh1[] + spacing, fw2[], fh2[]))
+            SDL_RenderCopy(data.renderer, tex2, C_NULL, dst2)
+            SDL_DestroyTexture(tex2)
+        end
+        SDL_FreeSurface(surf2)
+    end
+end
+
 @inline function close_display(data)
+    data.font != C_NULL && TTF_CloseFont(data.font)
+    TTF_Quit()
     data.cue_texture != C_NULL && SDL_DestroyTexture(data.cue_texture)
     data.renderer != C_NULL && SDL_DestroyRenderer(data.renderer)
     data.win != C_NULL && SDL_DestroyWindow(data.win)
