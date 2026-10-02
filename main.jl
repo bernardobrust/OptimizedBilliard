@@ -3,8 +3,8 @@ include("src/Render.jl")
 include("src/Update.jl")
 
 fps_target::Int32 = 120
-win_w::Int32 = 800
-win_h::Int32 = 450
+win_w::Int32 = 1200
+win_h::Int32 = 800
 
 win, renderer = Render.init_display(win_w, win_h)
 font = Render.load_font(Int32(16))

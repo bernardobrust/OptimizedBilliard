@@ -3,11 +3,8 @@ module Render
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
-# Precaulculated version of:
-# const CIRCLE_R10_OFFSETS = Int32[round(Int32, sqrt(Float32(100 - dy^2))) for dy in -10:10]
-const CIRCLE_R10_OFFSETS = Int32[
-    0, 4, 6, 7, 8, 8, 9, 9, 10, 10, 10, 10, 10, 9, 9, 8, 8, 7, 6, 4, 0
-]
+# Precaulculated is not really worth it
+const CIRCLE_R15_OFFSETS = Int32[round(Int32, sqrt(Float32(225 - dy^2))) for dy in -15:15]
 
 @inline function init_display(width::Int32, height::Int32)
     @assert SDL_Init(SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL_GetError()))"
@@ -54,7 +51,7 @@ end
 
 @inline function draw_circle_r10(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
     @inbounds for dy in Int32(-10):Int32(10)
-        dx = CIRCLE_R10_OFFSETS[dy+11]
+        dx = CIRCLE_R15_OFFSETS[dy+11]
         SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy)
     end
 end

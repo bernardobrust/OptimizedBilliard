@@ -50,6 +50,11 @@ Julia uses a JIT compiler, so you can just call the compiler against main:
 julia main.jl
 ```
 
+On Wayland you may be required to switch to X11 and use `XWayland`:
+```bash
+SDL_VIDEODRIVER=x11 julia main.jl
+```
+
 To run with optimizations enabled:
 ```bash
 julia -O3 -g0 main.jl
