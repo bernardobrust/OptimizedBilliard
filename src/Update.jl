@@ -163,6 +163,7 @@ using SimpleDirectMediaLayer.LibSDL2
     data.paused && (Input.end_frame(); return true)
 
     # Ball motion and wall reflection
+    # @TODO: randomize speed to check predictor stability
     @inbounds @fastmath @simd for i in 1:data.num_balls
         x = data.ball_x[i] + data.ball_vx[i] * dt
         y = data.ball_y[i] + data.ball_vy[i] * dt
