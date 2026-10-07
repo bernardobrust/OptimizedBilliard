@@ -1,3 +1,6 @@
+# 0-order Predictor-corrector model (a.k.a constant prediction, a.k.a Newton tracker)
+
+
 # jacobian (x) => Jacobiana aplicada em x
 # f(x) = line-circle error system
 
@@ -12,7 +15,9 @@
 
 # We'll need J as functions, J_inv for the precomputed inverse of a 2x2
 # Newton is defined as:
-# X_n+1 = X_n - J_inv * f(x_n)
+# x_n+1 = X_n - J_inv * f(x_n)
+# Or we can use:
+# dx = - J_inv * f(x_n)
 
 # The 't' will be new, so f(x_n) may not converge to 0
 

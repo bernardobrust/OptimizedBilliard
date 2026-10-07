@@ -4,7 +4,8 @@ using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
 # Precaulculated is not really worth it
-const CIRCLE_R15_OFFSETS = Int32[round(Int32, sqrt(Float32(225 - dy^2))) for dy in -15:15]
+const RADIUS = 18
+const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(225 - dy^2))) for dy in -RADIUS:RADIUS]
 
 @inline function init_display(width::Int32, height::Int32)
     @assert SDL_Init(SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL_GetError()))"
@@ -49,21 +50,9 @@ function load_font(ptsize::Int32 = Int32(16))::Ptr{TTF_Font}
     return Ptr{TTF_Font}(C_NULL)
 end
 
-@inline function draw_circle_r10(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
-    @inbounds for dy in Int32(-10):Int32(10)
-        dx = CIRCLE_R15_OFFSETS[dy+11]
-        SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy)
-    end
-end
-
-@inline function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32, r::Int32)
-    if r == 10
-        draw_circle_r10(renderer, cx, cy)
-        return
-    end
-    r_sq = r * r
-    for dy in (-r):r
-        dx = round(Int32, sqrt(Float32(r_sq - dy * dy)))
+@inline function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
+    @inbounds for dy in Int32(-RADIUS):Int32(RADIUS)
+        dx = CIRCLE_OFFSETS[dy+RADIUS+1]
         SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy)
     end
 end
@@ -87,14 +76,13 @@ end
     SDL_RenderCopyEx(data.renderer, data.cue_texture, C_NULL, dst, Float64(data.cue_angle), center, SDL_FLIP_NONE)
 
     # Balls
-    r = round(Int32, data.ball_radius)
     @inbounds for i in 1:data.num_balls
         if i == data.selected_ball_id
             SDL_SetRenderDrawColor(data.renderer, 0, 120, 255, 255)
         else
             SDL_SetRenderDrawColor(data.renderer, 230, 41, 55, 255)
         end
-        draw_circle(data.renderer, round(Int32, data.ball_x[i]), round(Int32, data.ball_y[i]), r)
+        draw_circle(data.renderer, round(Int32, data.ball_x[i]), round(Int32, data.ball_y[i]))
     end
 
     # Tracking indicator for the exact point on the selected ball
