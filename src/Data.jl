@@ -71,7 +71,7 @@ function init_data(
     font::Ptr{TTF_Font} = Ptr{TTF_Font}(C_NULL)
 )::DataPlex
     num_balls = Int32(16)
-    ball_radius = 15.0f0
+    ball_radius = 18.0f0
     speed = 140.0f0
 
     ball_x = Vector{Float32}(undef, num_balls)

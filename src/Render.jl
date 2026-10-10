@@ -51,7 +51,7 @@ function load_font(ptsize::Int32 = Int32(16))::Ptr{TTF_Font}
 end
 
 @inline function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
-    @inbounds for dy in Int32(-RADIUS):Int32(RADIUS)
+    @inbounds @fastmath @simd for dy in Int32(-RADIUS):Int32(RADIUS)
         dx = CIRCLE_OFFSETS[dy+RADIUS+1]
         SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy)
     end
@@ -82,6 +82,7 @@ end
         else
             SDL_SetRenderDrawColor(data.renderer, 230, 41, 55, 255)
         end
+
         draw_circle(data.renderer, round(Int32, data.ball_x[i]), round(Int32, data.ball_y[i]))
     end
 

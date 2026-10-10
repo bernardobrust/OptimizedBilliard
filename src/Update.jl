@@ -119,8 +119,8 @@ end
             data.dragging_cue = true
             data.drag_offset_x = mx - data.cue_x
             data.drag_offset_y = my - data.cue_y
-            # Aim
         else
+            # Aim
             clicked_ball_id = Int32(0)
             rad_sq = rad * rad
             @inbounds for i in 1:data.num_balls
@@ -140,10 +140,11 @@ end
                 data.target_x = mx
                 data.target_y = my
                 data.has_aim = true
+
                 aim_cue!(data, clicked_ball_id)
 
-                # Fixed direction clicked in empty space
             else
+                # Fixed direction clicked in empty space
                 cdx = mx - data.cue_x
                 cdy = my - data.cue_y
                 cdist = sqrt(cdx * cdx + cdy * cdy)
@@ -156,6 +157,7 @@ end
                     data.track_offset_y = 0.0f0
                     data.selected_ball_id = Int32(0)
                     data.has_aim = true
+
                     aim_cue!(data, Int32(0))
                 end
             end

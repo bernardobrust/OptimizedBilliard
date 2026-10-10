@@ -36,152 +36,17 @@ module HomotopySolution
 using LinearAlgebra
 using Random
 
-export fn, dh1dx, dh2dx, H, Hx, Ht, rk4_step, newton_step, track, gen_params, gen_roots, aim_cue!
-
-@inline function fn(r, params)
-    a, b, c, d, e, f, g = params
-    x, y = r[1], r[2]
-    f1 = a * (x^2 + y^2) + b * x + c * y + d
-    f2 = e * x + f * y + g
-    return [f1, f2]
-end
-
-@inline function dh1dx(r, params)
-    a, b, c, d, e, f, g = params
-    x, y = r[1], r[2]
-    df1dx = a * (x * 2) + b
-    df1dy = a * (y * 2) + c
-    return [df1dx, df1dy]
-end
-
-@inline function dh2dx(r, params)
-    a, b, c, d, e, f, g = params
-    df2dx = e
-    df2dy = f
-    return [df2dx, df2dy]
-end
-
-# Homotopy function connecting initial system params_i to target params_f:
-# H(x, t) = fn(x, params_i * (1 - t) + params_f * t)
-@inline function H(x, t, params_i, params_f)
-    pt = params_i .* (1.0 - t) .+ params_f .* t
-    return fn(x, pt)
-end
-
-# Jacobian matrix of H with respect to x:
-#  | dh1/dx  dh1/dy |
-#  | dh2/dx  dh2/dy |
-@inline function Hx(x, t, params_i, params_f)
-    pt = params_i .* (1.0 - t) .+ params_f .* t
-    d1 = dh1dx(x, pt)
-    d2 = dh2dx(x, pt)
-    return [d1[1] d1[2]; d2[1] d2[2]]
-end
-
-# Partial derivative of H with respect to continuation parameter t:
-# dH/dt = fn(x, -params_i + params_f)
-function Ht(x, t, params_i, params_f)
-    return fn(x, .- params_i .+ params_f)
-end
-
-@inline function solve_2x2(A, b)
-    detA = A[1,1] * A[2,2] - A[1,2] * A[2,1]
-    if abs(detA) < 1e-15
-        return A \ b
-    end
-    invdet = 1.0 / detA
-    return [invdet * (A[2,2] * b[1] - A[1,2] * b[2]),
-            invdet * (-A[2,1] * b[1] + A[1,1] * b[2])]
-end
-
-# 4th-order Runge-Kutta integration step for homotopic path tracking along
-# Davidenko differential equation: dx/dt = - Hx(x, t)^(-1) * Ht(x, t).
-@inline function rk4_step(ic, t, p_i, pf, dt=1e-2)
-    dx = dt
-    J1 = Hx(ic, t, p_i, pf)
-    f1 = -solve_2x2(J1, Ht(ic, t, p_i, pf))
-
-    x2 = ic .+ f1 .* (dx / 2)
-    t2 = t + dt / 2
-    f2 = -solve_2x2(Hx(x2, t2, p_i, pf), Ht(x2, t2, p_i, pf))
-
-    x3 = ic .+ f2 .* (dx / 2)
-    t3 = t + dt / 2
-    f3 = -solve_2x2(Hx(x3, t3, p_i, pf), Ht(x3, t3, p_i, pf))
-
-    x4 = ic .+ f3 .* dx
-    t4 = t + dt
-    f4 = -solve_2x2(Hx(x4, t4, p_i, pf), Ht(x4, t4, p_i, pf))
-
-    return ic .+ (f1 .+ 2 .* f2 .+ 2 .* f3 .+ f4) ./ 6
-end
-
-# Newton-Raphson corrector step for error reduction:
-# x_new = x - Hx(x, t)^(-1) * H(x, t)
-function newton_step(ic, t, pi, pf, dumpHx=false)
-    J = Hx(ic, t, pi, pf)
-    x1 = ic .- solve_2x2(J, H(ic, t, pi, pf))
-    it = 0
-    while norm(x1 .- ic) > 1e-2 && it < 30
-        ic = x1
-        J = Hx(ic, t, pi, pf)
-        x1 = ic .- solve_2x2(J, H(ic, t, pi, pf))
-        it += 1
-    end
-    det_val = abs(J[1,1] * J[2,2] - J[1,2] * J[2,1])
-    return x1, det_val
-end
-
-# Path tracker on homotopic continuation from initial root ic to target system pf.
-function track(ic, pi, pf)
-    thresh = 1.9
-    t = 0.0
-    dt = 1e-1
-    red = 0.5
-    inc = 2.0
-    p = []
-    time_pts = [t]
-    absvol = []
-    itr = 0
-    curr = ic
-    @fastmath while t < 1.0 && itr < 100
-        step_dt = min(dt, 1.0 - t)
-        x1 = rk4_step(curr, t, pi, pf, step_dt)
-        next_t = t + step_dt
-        y, v = newton_step(x1, next_t, pi, pf, true)
-
-        sub_it = 0
-        while norm(y .- x1) > thresh && sub_it < 10
-            x1 = y
-            y, v = newton_step(x1, next_t, pi, pf, true)
-            sub_it += 1
-        end
-
-        if norm(y .- curr) > thresh
-            dt *= red
-        else
-            dt = min(dt * inc, 0.5)
-            curr = y
-            t = next_t
-            push!(p, y)
-            push!(time_pts, t)
-            push!(absvol, v)
-        end
-        itr += 1
-    end
-    y_final, v_final = newton_step(curr, 1.0, pi, pf, true)
-    return y_final, p, time_pts, absvol
-end
-
+export track, gen_params, gen_roots, aim_cue!
 
 # Uniform distribution parameter generation for start system.
-@inline function gen_params()
+@inline @fastmath function gen_params()
     return rand(Float64, 7) .+ im .* rand(Float64, 7)
 end
 
 # Generate roots for the line-circle geometric system analytically.
-@inline function gen_roots(params)
+@inline @fastmath function gen_roots(params)
     a, b, c, d, e, f, g = params
+
     if abs(f) >= abs(e)
         A = a * (e^2 + f^2)
         B = 2 * a * e * g + b * f^2 - c * e * f
@@ -191,6 +56,7 @@ end
         y1 = -(e * x1 + g) / f
         x2 = (-B - disc) / (2 * A)
         y2 = -(e * x2 + g) / f
+
         return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
     else
         A = a * (e^2 + f^2)
@@ -201,11 +67,12 @@ end
         x1 = -(f * y1 + g) / e
         y2 = (-B - disc) / (2 * A)
         x2 = -(f * y2 + g) / e
+
         return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
     end
 end
 
-@inline function fn_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
+@inline @fastmath function fn_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
     x, y = r
     a, b, c, d, e, f, g = p
     f1 = a * (x*x + y*y) + b * x + c * y + d
@@ -213,9 +80,10 @@ end
     return (f1, f2)
 end
 
-@inline function dh1dx_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
+@inline @fastmath function dh1dx_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
     x, y = r
     a, b, c, d, e, f, g = p
+
     return (2.0 * a * x + b, 2.0 * a * y + c)
 end
 
@@ -223,13 +91,18 @@ end
     return (p[5], p[6])
 end
 
-@inline function H_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+# Homotopy function connecting initial system params_i to target params_f:
+# H(x, t) = fn(x, params_i * (1 - t) + params_f * t)
+@inline @fastmath function H_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
     one_minus_t = 1.0 - t
     pt = ntuple(i -> pi[i] * one_minus_t + pf[i] * t, 7)
     return fn_fast(x, pt)
 end
 
-@inline function Hx_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+# Jacobian matrix of H with respect to x:
+#  | dh1/dx  dh1/dy |
+#  | dh2/dx  dh2/dy |
+@inline @fastmath function Hx_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
     one_minus_t = 1.0 - t
     pt = ntuple(i -> pi[i] * one_minus_t + pf[i] * t, 7)
     d1x, d1y = dh1dx_fast(x, pt)
@@ -237,23 +110,30 @@ end
     return (d1x, d1y, d2x, d2y)
 end
 
+# Partial derivative of H with respect to continuation parameter t:
+# dH/dt = fn(x, -params_i + params_f)
 @inline function Ht_fast(x::Tuple{ComplexF64, ComplexF64}, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
     dp = ntuple(i -> pf[i] - pi[i], 7)
     return fn_fast(x, dp)
 end
 
-@inline function solve_2x2_fast(J::NTuple{4, ComplexF64}, b::Tuple{ComplexF64, ComplexF64})
+@inline @fastmath function solve_2x2_fast(J::NTuple{4, ComplexF64}, b::Tuple{ComplexF64, ComplexF64})
     j11, j12, j21, j22 = J
     b1, b2 = b
     detJ = j11 * j22 - j12 * j21
+
     if abs(detJ) < 1e-15
         detJ = 1e-15 + 0.0im
     end
+
     invdet = 1.0 / detJ
+
     return (invdet * (j22 * b1 - j12 * b2), invdet * (-j21 * b1 + j11 * b2))
 end
 
-@inline function rk4_step_fast(ic::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64}, dt::Float64)
+# 4th-order Runge-Kutta integration step for homotopic path tracking along
+# Davidenko differential equation: dx/dt = - Hx(x, t)^(-1) * Ht(x, t).
+@inline @fastmath function rk4_step_fast(ic::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64}, dt::Float64)
     J1 = Hx_fast(ic, t, pi, pf)
     Ht1 = Ht_fast(ic, pi, pf)
     sol1 = solve_2x2_fast(J1, Ht1)
@@ -281,10 +161,13 @@ end
     k4 = (-sol4[1], -sol4[2])
 
     inv6 = 1.0 / 6.0
+
     return (ic[1] + (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]) * dt * inv6,
             ic[2] + (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) * dt * inv6)
 end
 
+# Newton-Raphson corrector step for error reduction:
+# x_new = x - Hx(x, t)^(-1) * H(x, t)
 @inline function newton_step_fast(ic::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
     x = ic
 
@@ -295,13 +178,17 @@ end
         x_next = (x[1] - dx[1], x[2] - dx[2])
         diff = abs(dx[1])^2 + abs(dx[2])^2
         x = x_next
+
         if diff < 1e-4
             break
         end
     end
+
     return x
 end
 
+
+# Path tracker on homotopic continuation from initial root ic to target system pf.
 @inline function track_fast(ic::Tuple{ComplexF64, ComplexF64}, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
     thresh_sq = 1.9^2
     t = 0.0
@@ -317,6 +204,7 @@ end
 
         diff_pred = abs(corr[1] - pred[1])^2 + abs(corr[2] - pred[2])^2
         sub_it = 0
+
         while diff_pred > thresh_sq && sub_it < 10
             pred = corr
             corr = newton_step_fast(pred, next_t, pi, pf)
@@ -325,6 +213,7 @@ end
         end
 
         diff_curr = abs(corr[1] - curr[1])^2 + abs(corr[2] - curr[2])^2
+
         if diff_curr > thresh_sq
             dt *= 0.5
         else
@@ -332,6 +221,7 @@ end
             curr = corr
             t = next_t
         end
+
         itr += 1
     end
 
@@ -339,7 +229,7 @@ end
 end
 
 # Integration with the system
-@inline function aim_cue!(data, sid::Int32)
+@inline @fastmath function aim_cue!(data, sid::Int32)
     qx = data.cue_x
     qy = data.cue_y
 
@@ -371,7 +261,6 @@ end
     else
         tx = data.ball_x[sid] + data.track_offset_x
         ty = data.ball_y[sid] + data.track_offset_y
-
         dx = tx - qx
         dy = ty - qy
 
@@ -455,11 +344,12 @@ end
         sol1 = track_fast(r_entry, pi, pf)
         sol2 = track_fast(r_exit,  pi, pf)
 
-        @fastmath for sol in (sol1, sol2)
+        @inbounds @fastmath for sol in (sol1, sol2)
             if abs(imag(sol[1])) < 1.0 && abs(imag(sol[2])) < 1.0
                 rx = Float32(real(sol[1]))
                 ry = Float32(real(sol[2]))
                 t_hit = (rx - qx) * ux + (ry - qy) * uy
+
                 if t_hit > 0.0f0 && t_hit < t_min
                     t_min = t_hit
                     hit_x = rx
