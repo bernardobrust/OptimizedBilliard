@@ -1,11 +1,14 @@
-# 0-order Predictor-corrector model (a.k.a constant prediction, a.k.a Newton tracker)
+# x, p and c are vectors implicitly, t is a scalar time parameter implicit in all functions wich determines the values of c and p
+# delta_t is hyperparameter
+
+# == 0-order Predictor-corrector model (a.k.a constant prediction, a.k.a Newton tracker) ==
 
 
-# jacobian (x) => Jacobiana aplicada em x
+# jacobian (x) => Jacobian aplied on x
 # f(x) = line-circle error system
 
-# f(x) = eps_1 { n^t(x - p) }
-#        eps_2 { (x - c)^t(x - c) }
+# f(x) = eps_1 { n_transpose * (x - p) }
+#      eps_2 { (x - c)_transpose * (x - c) }
 
 # Use eps_1 and eps_2 as the equations for the jacobian
 # Solve the system for the new eps_1 and eps_2 from either the simple solution
@@ -13,13 +16,22 @@
 # required for covergion s.t it's limited to 2 steps.
 # This way we can ajust the convergence point to the Newton result.
 
-# We'll need J as functions, J_inv for the precomputed inverse of a 2x2
+# We'll need J as functions, J_inv for the analytical inverse of a 2x2
 # Newton is defined as:
 # x_n+1 = X_n - J_inv * f(x_n)
 # Or we can use:
 # dx = - J_inv * f(x_n)
 
 # The 't' will be new, so f(x_n) may not converge to 0
+
+
+# == 1-order Predictor-corrector model (using a 4th order Runge Kutta) ==
+
+
+@TODO after 0-order
+
+
+# == Investigations ==
 
 # Optimization conserns:
 # 1. dt value may be dependent of the speed of the ball

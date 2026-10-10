@@ -5,7 +5,7 @@ using SimpleDirectMediaLayer.LibSDL2
 
 # Precaulculated is not really worth it
 const RADIUS = 18
-const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(225 - dy^2))) for dy in -RADIUS:RADIUS]
+const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(RADIUS*RADIUS - dy^2))) for dy in -RADIUS:RADIUS]
 
 @inline function init_display(width::Int32, height::Int32)
     @assert SDL_Init(SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL_GetError()))"
