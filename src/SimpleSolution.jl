@@ -1,3 +1,7 @@
+module SimpleSolution
+
+export aim_cue!
+
 # Simple solution for cue aiming in a billiards game, based on tracking the contact point on the ball
 # and raycasting the Line of Sight (LOS) against all other balls to find the first collision point.
 
@@ -142,3 +146,5 @@
     data.collision_x = hit_x
     data.collision_y = hit_y
 end
+
+end # module SimpleSolution

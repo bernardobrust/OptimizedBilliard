@@ -147,6 +147,7 @@ end
 
     fps_str = "FPS: $(round(Int, data.fps))"
     fps_10s_str = "10s: $(round(data.fps_10s, digits=1))"
+    sol_str = data.current_solution == :simple ? "Sol: Simple" : "Sol: Homotopy"
 
     w_ref = Ref{Cint}(0)
     h_ref = Ref{Cint}(0)
@@ -159,17 +160,20 @@ end
 
     surf1 = TTF_RenderText_Blended(data.font, fps_str, color)
     surf2 = TTF_RenderText_Blended(data.font, fps_10s_str, color)
+    surf3 = TTF_RenderText_Blended(data.font, sol_str, color)
 
-    surf1 == C_NULL && surf2 == C_NULL && return
+    surf1 == C_NULL && surf2 == C_NULL && surf3 == C_NULL && return
 
     fw1, fh1 = Ref{Cint}(0), Ref{Cint}(0)
     fw2, fh2 = Ref{Cint}(0), Ref{Cint}(0)
+    fw3, fh3 = Ref{Cint}(0), Ref{Cint}(0)
 
     surf1 != C_NULL && TTF_SizeText(data.font, fps_str, fw1, fh1)
     surf2 != C_NULL && TTF_SizeText(data.font, fps_10s_str, fw2, fh2)
+    surf3 != C_NULL && TTF_SizeText(data.font, sol_str, fw3, fh3)
 
-    max_w = max(fw1[], fw2[])
-    total_h = fh1[] + (surf2 != C_NULL ? fh2[] + spacing : Int32(0))
+    max_w = max(fw1[], fw2[], fw3[])
+    total_h = fh1[] + (surf2 != C_NULL ? fh2[] + spacing : Int32(0)) + (surf3 != C_NULL ? fh3[] + spacing : Int32(0))
 
     pad = Int32(6)
     bg_rect = Ref(SDL_Rect(win_w - max_w - margin - pad, margin - pad, max_w + 2 * pad, total_h + 2 * pad))
@@ -195,6 +199,17 @@ end
             SDL_DestroyTexture(tex2)
         end
         SDL_FreeSurface(surf2)
+    end
+
+    if surf3 != C_NULL
+        tex3 = SDL_CreateTextureFromSurface(data.renderer, surf3)
+        if tex3 != C_NULL
+            y_offset = margin + fh1[] + spacing + (surf2 != C_NULL ? fh2[] + spacing : Int32(0))
+            dst3 = Ref(SDL_Rect(win_w - fw3[] - margin, y_offset, fw3[], fh3[]))
+            SDL_RenderCopy(data.renderer, tex3, C_NULL, dst3)
+            SDL_DestroyTexture(tex3)
+        end
+        SDL_FreeSurface(surf3)
     end
 end
 

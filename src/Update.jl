@@ -2,11 +2,19 @@ module Update
 
 include("Input.jl")
 
-# @TODO: Change the solution to based on a toggle (like pressing 's' switches to the next solution)
 include("SimpleSolution.jl")
+include("HomotopySolution.jl")
 
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
+
+@inline function aim_cue!(data, sid::Int32)
+    if data.current_solution == :homotopy
+        HomotopySolution.aim_cue!(data, sid)
+    else
+        SimpleSolution.aim_cue!(data, sid)
+    end
+end
 
 @inline function update(data)::Bool
     event_ref = Ref{SDL_Event}()
@@ -20,6 +28,13 @@ using SimpleDirectMediaLayer.LibSDL2
         elseif evt.type == SDL_KEYDOWN
             if evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.key.repeat == 0
                 data.paused = !data.paused
+            elseif evt.key.keysym.scancode == SDL_SCANCODE_S && evt.key.repeat == 0
+				# We'll need to change this latter for supporting 3 solutions
+                data.current_solution = (data.current_solution == :simple ? :homotopy : :simple)
+                println("[Solution] Switched to: $(data.current_solution == :simple ? "Simple Solution" : "Homotopy Continuation")")
+                if data.selected_ball_id != 0 || data.has_aim
+                    aim_cue!(data, data.selected_ball_id)
+                end
             else
                 Input.handle_key(true, evt.key.keysym.scancode)
             end

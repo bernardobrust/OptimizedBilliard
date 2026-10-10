@@ -49,6 +49,9 @@ mutable struct DataPlex
     # Pause system
     paused::Bool
 
+    # Solution mode (:simple or :homotopy)
+    current_solution::Symbol
+
     # Font & FPS Counter
     font::Ptr{TTF_Font}
     fps::Float64
@@ -127,6 +130,7 @@ function init_data(
         renderer,
         cue_texture,
         false,
+        :simple,
         font,
         0.0,
         0.0,
