@@ -59,3 +59,96 @@ To run with optimizations enabled:
 ```bash
 julia -O3 -g0 main.jl
 ```
+
+### Controls
+- **Left Mouse Click**: Aim cue at clicked location or ball.
+- **S Key**: Cycle through aiming calculation methods:
+  - `Simple`: Closed-form geometric quadratic line-circle solver.
+  - `Homotopy`: Polynomial homotopy path tracking.
+  - `DE (Constant)`: Davidenko differential continuation with frame-to-frame temporal tracking and Newton displacement collision detection.
+  - `DE (RK4)`: 4th-order Runge-Kutta numerical integration of the Davidenko vector field.
+- **Escape**: Exit application.
+
+## Experimental Results & Performance Analysis
+
+To evaluate the computational efficiency and operational trade-offs of each method, an automated benchmark suite was developed in [experiments/benchmark.jl](experiments/benchmark.jl). The benchmarks evaluate the solvers across scaling ball counts and diverse physical scenarios over 15,000 iterations per test, generating plots natively in Julia via [experiments/plot_utils.jl](experiments/plot_utils.jl).
+
+### Summary: Standard 16-Ball Match
+
+The table below summarizes the throughput and per-frame latency for a standard pool table configuration with 16 balls:
+
+| Method | Mean Latency / Frame | Max Theoretical FPS | Relative Speedup | Primary Advantage |
+| :--- | :---: | :---: | :---: | :--- |
+| **Simple (Closed-Form)** | **~39.5 ns** | **~25.3M FPS** | **25.4×** | Minimal latency for low-degree algebra; direct formula. |
+| **DE (Constant / 0-order)** | **~75.2 ns** | **~13.3M FPS** | **13.4×** | Leverages temporal coherence ($\Delta t$); ultra-fast Newton convergence. |
+| **DE (RK4 Integration)** | **~258.4 ns** | **~3.87M FPS** | **3.89×** | High fidelity for curved parameter paths; continuous ODE tracking. |
+| **Homotopy Continuation** | **~1004.4 ns** | **~1.00M FPS** | **1.00× (Baseline)** | Globally robust for high-degree polynomial systems with no closed form. |
+
+![Standard 16-Ball Summary](experiments/results_summary.png)
+
+---
+
+### Scaling with Ball Count
+
+As the number of balls on the table increases from 4 to 64, the line-of-sight (LOS) algorithm checks for blocking balls along the cue's ray:
+
+![Ball Count Scaling](experiments/results_ball_scaling.png)
+
+- **Simple Solution ($O(N)$)**: Performs scalar quadratic discriminant checks. Highly SIMD-friendly with zero memory allocation, scaling from **15.2 ns** (4 balls) to **62.8 ns** (64 balls).
+- **DE Solution ($O(N)$)**: Tracks the active collision candidate using temporal velocity extrapolation and Newton refinement. Scaling ranges from **37.1 ns** to **182.3 ns** (0-order) and **75.2 ns** to **344.4 ns** (RK4).
+- **Homotopy Continuation ($O(N \cdot K)$)**: While the search across balls is $O(N)$, tracking multiple parameter steps ($K$) through the homotopy deformation path imparts a constant overhead of ~340 ns (low ball count) to ~1147 ns (64 balls).
+
+---
+
+### Performance Across Operational Scenarios
+
+Four specific dynamic scenarios were evaluated:
+1. **Clear Line of Sight (LOS)**: Direct uninterrupted ray to target ball.
+2. **Blocked LOS**: An intermediate ball obstructs the cue line, requiring collision detection.
+3. **Dense Table (32 Balls)**: High-density field with multiple nearby balls.
+4. **Collision Bounce**: Ball velocities reverse abruptly, forcing the Newton displacement tracker to detect discontinuity.
+
+![Operational Scenarios](experiments/results_scenarios.png)
+
+---
+
+### Order of Performance & Scenario Suitability
+
+#### 1. **Simple (Closed-Form Analytical)** — *Rank 1 (Fastest)*
+- **Why it is fastest**: The line-circle intersection problem is quadratic ($a t^2 + b t + c = 0$). Solving it requires only scalar arithmetic, a single square root, and minimal branching. It has zero iterative overhead and zero matrix inversions.
+- **When it is best**:
+  - Low-degree algebraic geometry (lines, circles, planes, spheres).
+  - Systems without temporal coherence (e.g., sporadic ray queries, teleporting objects).
+  - Maximum raw FPS requirement with negligible memory overhead.
+
+#### 2. **Differential Equations (Constant / 0-order Predictor)** — *Rank 2*
+- **Why it performs well**: By exploiting **temporal coherence** between consecutive video frames ($x_t \approx x_{t-1} + v \Delta t$), the initial guess for Newton's method is already within $10^{-4}$ units of the true root. Convergence is achieved in just 1–2 unrolled Newton iterations using our analytical Jacobian inverse.
+- **Collision Detection**: If a sudden collision or occlusion occurs, the Newton correction step exceeds a displacement threshold ($\Delta > 15\text{ px}$), triggering an automatic fallback to relocate the candidate ball.
+- **When it is best**:
+  - Continuous real-time simulations where objects move smoothly between frames.
+  - Interactive physics engines with predictable frame times ($\Delta t \le 1/60\text{ s}$).
+  - Higher-order geometric shapes where closed-form solutions are complex or expensive, but Jacobian linearization is readily available.
+
+#### 3. **Differential Equations (RK4 Davidenko Predictor)** — *Rank 3*
+- **Why it has moderate overhead**: Rather than assuming constant velocity, RK4 integrates the continuous Davidenko vector field $\frac{dx}{dt} = -J(x, t)^{-1} \frac{\partial f}{\partial t}$ across 4 sub-stages per step before applying Newton refinement. This involves 4 Jacobian evaluations and matrix inversions per frame.
+- **When it is best**:
+  - Non-linear trajectories, accelerating reference frames, or curved ray fields.
+  - Large time steps ($\Delta t$) where constant-velocity linear extrapolation would step outside the quadratic convergence basin of Newton's method.
+  - Stiff continuation paths requiring high numerical stability.
+
+#### 4. **Homotopy Continuation** — *Rank 4 (Slowest for quadratic problems, but most general)*
+- **Why it is slower for line-circle**: Homotopy deforms an artificial start system into the target system over a parameterized path $t \in [0, 1]$. For an elementary quadratic equation, path tracking carries significant algorithmic overhead compared to the quadratic formula.
+- **When it is best**:
+  - Systems of non-linear polynomial equations of degree $d \ge 5$ where closed-form algebraic solutions are mathematically impossible (Abel-Ruffini theorem).
+  - Problems where all complex and isolated roots must be discovered without requiring a good initial guess.
+  - Mechanism synthesis, robotic kinematics, and algebraic curve intersection.
+
+---
+
+### Running Benchmarks & Generating Plots
+
+The benchmark suite and plotting scripts have zero external plotting dependencies (rendered directly to SVG and converted via `rsvg-convert`):
+
+```bash
+julia experiments/benchmark.jl
+```

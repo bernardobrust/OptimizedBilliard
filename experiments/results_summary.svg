@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <text x="440.0" y="38" text-anchor="middle" font-size="20" font-weight="bold" fill="#212121">Standard Billiard Setup Performance (16 Balls)</text>
+  <line x1="90" y1="440.0" x2="720" y2="440.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="444.0" text-anchor="end" font-size="12" fill="#616161">0</text>
+  <line x1="90" y1="366.0" x2="720" y2="366.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="370.0" text-anchor="end" font-size="12" fill="#616161">241</text>
+  <line x1="90" y1="292.0" x2="720" y2="292.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="296.0" text-anchor="end" font-size="12" fill="#616161">482</text>
+  <line x1="90" y1="218.0" x2="720" y2="218.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="222.0" text-anchor="end" font-size="12" fill="#616161">723</text>
+  <line x1="90" y1="144.0" x2="720" y2="144.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="148.0" text-anchor="end" font-size="12" fill="#616161">964</text>
+  <line x1="90" y1="70.0" x2="720" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="74.0" text-anchor="end" font-size="12" fill="#616161">1205</text>
+  <text x="405.0" y="464" text-anchor="middle" font-size="13" font-weight="600" fill="#424242">Standard 16 Balls</text>
+  <rect x="349.0" y="427.9" width="26.0" height="12.1" rx="3" fill="#2E7D32"/>
+  <text x="362.0" y="422.9" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">39</text>
+  <rect x="377.0" y="416.9" width="26.0" height="23.1" rx="3" fill="#1976D2"/>
+  <text x="390.0" y="411.9" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">75</text>
+  <rect x="405.0" y="360.7" width="26.0" height="79.3" rx="3" fill="#E65100"/>
+  <text x="418.0" y="355.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">258</text>
+  <rect x="433.0" y="131.7" width="26.0" height="308.3" rx="3" fill="#C2185B"/>
+  <text x="446.0" y="126.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">1004</text>
+  <line x1="90" y1="70" x2="90" y2="440" stroke="#424242" stroke-width="1.5"/>
+  <line x1="90" y1="440" x2="720" y2="440" stroke="#424242" stroke-width="1.5"/>
+  <text transform="rotate(-90)" x="-255.0" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Latency (ns / frame)</text>
+  <rect x="736" y="80" width="135" height="120" rx="6" fill="#F8F9FA" stroke="#E0E0E0" stroke-width="1"/>
+  <rect x="748" y="88" width="12" height="12" rx="2" fill="#2E7D32"/>
+  <text x="768" y="98" font-size="12" font-weight="500" fill="#333333">Simple</text>
+  <rect x="748" y="114" width="12" height="12" rx="2" fill="#1976D2"/>
+  <text x="768" y="124" font-size="12" font-weight="500" fill="#333333">DE (Constant)</text>
+  <rect x="748" y="140" width="12" height="12" rx="2" fill="#E65100"/>
+  <text x="768" y="150" font-size="12" font-weight="500" fill="#333333">DE (RK4)</text>
+  <rect x="748" y="166" width="12" height="12" rx="2" fill="#C2185B"/>
+  <text x="768" y="176" font-size="12" font-weight="500" fill="#333333">Homotopy</text>
+</svg>
