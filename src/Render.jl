@@ -151,10 +151,12 @@ end
 
     if data.current_solution == :simple
         sol_str = "Sol: Simple"
-    elseif (data.current_solution == :homotopy)
+    elseif data.current_solution == :homotopy
         sol_str = "Sol: Homotopy"
+    elseif data.current_solution == :de_constant
+        sol_str = "Sol: DE (Constant)"
     else
-        sol_str = "Sol: DE"
+        sol_str = "Sol: DE (RK4)"
     end
 
     w_ref = Ref{Cint}(0)

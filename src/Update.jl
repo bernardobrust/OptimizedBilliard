@@ -12,9 +12,13 @@ using SimpleDirectMediaLayer.LibSDL2
 @inline function aim_cue!(data, sid::Int32)
     if data.current_solution == :simple
         SimpleSolution.aim_cue!(data, sid)
-    elseif (data.current_solution == :homotopy)
+    elseif data.current_solution == :homotopy
         HomotopySolution.aim_cue!(data, sid)
+    elseif data.current_solution == :de_constant
+        DESolution.set_predictor_mode!(:zero_order)
+        DESolution.aim_cue!(data, sid)
     else
+        DESolution.set_predictor_mode!(:rk4)
         DESolution.aim_cue!(data, sid)
     end
 end
@@ -33,13 +37,17 @@ end
                 data.paused = !data.paused
             elseif evt.key.keysym.scancode == SDL_SCANCODE_S && evt.key.repeat == 0
 				data.sol_id += 1
-                data.sol_id %= 3
-                if (data.sol_id == 0)
+                data.sol_id %= 4
+                if data.sol_id == 0
                     data.current_solution = :simple
-                elseif (data.sol_id == 1)
+                elseif data.sol_id == 1
                     data.current_solution = :homotopy
+                elseif data.sol_id == 2
+                    data.current_solution = :de_constant
+                    DESolution.set_predictor_mode!(:zero_order)
                 else
-                    data.current_solution = :de
+                    data.current_solution = :de_rk4
+                    DESolution.set_predictor_mode!(:rk4)
                 end
 
                 if data.selected_ball_id != 0 || data.has_aim
