@@ -148,7 +148,14 @@ end
 
     fps_str = "FPS: $(round(Int, data.fps))"
     fps_10s_str = "10s: $(round(data.fps_10s, digits=1))"
-    sol_str = data.current_solution == :simple ? "Sol: Simple" : "Sol: Homotopy"
+
+    if data.current_solution == :simple
+        sol_str = "Sol: Simple"
+    elseif (data.current_solution == :homotopy)
+        sol_str = "Sol: Homotopy"
+    else
+        sol_str = "Sol: DE"
+    end
 
     w_ref = Ref{Cint}(0)
     h_ref = Ref{Cint}(0)

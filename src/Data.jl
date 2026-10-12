@@ -50,6 +50,7 @@ mutable struct DataPlex
     paused::Bool
 
     # Solution mode (:simple or :homotopy)
+    sol_id::Int32
     current_solution::Symbol
 
     # Font & FPS Counter
@@ -130,6 +131,7 @@ function init_data(
         renderer,
         cue_texture,
         false,
+        0,
         :simple,
         font,
         0.0,

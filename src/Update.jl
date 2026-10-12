@@ -4,15 +4,18 @@ include("Input.jl")
 
 include("SimpleSolution.jl")
 include("HomotopySolution.jl")
+include("DESolution.jl")
 
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
 @inline function aim_cue!(data, sid::Int32)
-    if data.current_solution == :homotopy
+    if data.current_solution == :simple
+        SimpleSolution.aim_cue!(data, sid)
+    elseif (data.current_solution == :homotopy)
         HomotopySolution.aim_cue!(data, sid)
     else
-        SimpleSolution.aim_cue!(data, sid)
+        DESolution.aim_cue!(data, sid)
     end
 end
 
@@ -29,9 +32,16 @@ end
             if evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.key.repeat == 0
                 data.paused = !data.paused
             elseif evt.key.keysym.scancode == SDL_SCANCODE_S && evt.key.repeat == 0
-				# We'll need to change this latter for supporting 3 solutions
-                data.current_solution = (data.current_solution == :simple ? :homotopy : :simple)
-                println("[Solution] Switched to: $(data.current_solution == :simple ? "Simple Solution" : "Homotopy Continuation")")
+				data.sol_id += 1
+                data.sol_id %= 3
+                if (data.sol_id == 0)
+                    data.current_solution = :simple
+                elseif (data.sol_id == 1)
+                    data.current_solution = :homotopy
+                else
+                    data.current_solution = :de
+                end
+
                 if data.selected_ball_id != 0 || data.has_aim
                     aim_cue!(data, data.selected_ball_id)
                 end
