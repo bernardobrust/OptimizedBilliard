@@ -51,13 +51,13 @@ end
         A = a * (e^2 + f^2)
         B = 2 * a * e * g + b * f^2 - c * e * f
         C = a * g^2 - c * f * g + d * f^2
-        disc = sqrt(Complex(B^2 - 4 * A * C))
+        disc = sqrt(B^2 - 4 * A * C)
         x1 = (-B + disc) / (2 * A)
         y1 = -(e * x1 + g) / f
         x2 = (-B - disc) / (2 * A)
         y2 = -(e * x2 + g) / f
 
-        return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
+        return [Float64[x1, y1], Float64[x2, y2]]
     else
         A = a * (e^2 + f^2)
         B = 2 * a * f * g + c * e^2 - b * e * f
@@ -68,11 +68,11 @@ end
         y2 = (-B - disc) / (2 * A)
         x2 = -(f * y2 + g) / e
 
-        return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
+        return [Float64[x1, y1], Float64[x2, y2]]
     end
 end
 
-@inline @fastmath function fn_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
+@inline @fastmath function fn_fast(r::Tuple{Float64, Float64}, p::NTuple{7, Float64})
     x, y = r
     a, b, c, d, e, f, g = p
     f1 = a * (x*x + y*y) + b * x + c * y + d
@@ -80,20 +80,20 @@ end
     return (f1, f2)
 end
 
-@inline @fastmath function dh1dx_fast(r::Tuple{ComplexF64, ComplexF64}, p::NTuple{7, ComplexF64})
+@inline @fastmath function dh1dx_fast(r::Tuple{Float64, Float64}, p::NTuple{7, Float64})
     x, y = r
     a, b, c, d, e, f, g = p
 
     return (2.0 * a * x + b, 2.0 * a * y + c)
 end
 
-@inline function dh2dx_fast(p::NTuple{7, ComplexF64})
+@inline function dh2dx_fast(p::NTuple{7, Float64})
     return (p[5], p[6])
 end
 
 # Homotopy function connecting initial system params_i to target params_f:
 # H(x, t) = fn(x, params_i * (1 - t) + params_f * t)
-@inline @fastmath function H_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+@inline @fastmath function H_fast(x::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     one_minus_t = 1.0 - t
     pt = ntuple(i -> pi[i] * one_minus_t + pf[i] * t, 7)
     return fn_fast(x, pt)
@@ -102,7 +102,7 @@ end
 # Jacobian matrix of H with respect to x:
 #  | dh1/dx  dh1/dy |
 #  | dh2/dx  dh2/dy |
-@inline @fastmath function Hx_fast(x::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+@inline @fastmath function Hx_fast(x::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     one_minus_t = 1.0 - t
     pt = ntuple(i -> pi[i] * one_minus_t + pf[i] * t, 7)
     d1x, d1y = dh1dx_fast(x, pt)
@@ -112,18 +112,18 @@ end
 
 # Partial derivative of H with respect to continuation parameter t:
 # dH/dt = fn(x, -params_i + params_f)
-@inline function Ht_fast(x::Tuple{ComplexF64, ComplexF64}, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+@inline function Ht_fast(x::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     dp = ntuple(i -> pf[i] - pi[i], 7)
     return fn_fast(x, dp)
 end
 
-@inline @fastmath function solve_2x2_fast(J::NTuple{4, ComplexF64}, b::Tuple{ComplexF64, ComplexF64})
+@inline @fastmath function solve_2x2_fast(J::NTuple{4, Float64}, b::Tuple{Float64, Float64})
     j11, j12, j21, j22 = J
     b1, b2 = b
     detJ = j11 * j22 - j12 * j21
 
     if abs(detJ) < 1e-15
-        detJ = 1e-15 + 0.0im
+        detJ = 1e-15 + 0.0
     end
 
     invdet = 1.0 / detJ
@@ -133,7 +133,7 @@ end
 
 # 4th-order Runge-Kutta integration step for homotopic path tracking along
 # Davidenko differential equation: dx/dt = - Hx(x, t)^(-1) * Ht(x, t).
-@inline @fastmath function rk4_step_fast(ic::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64}, dt::Float64)
+@inline @fastmath function rk4_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}, dt::Float64)
     J1 = Hx_fast(ic, t, pi, pf)
     Ht1 = Ht_fast(ic, pi, pf)
     sol1 = solve_2x2_fast(J1, Ht1)
@@ -168,10 +168,10 @@ end
 
 # Newton-Raphson corrector step for error reduction:
 # x_new = x - Hx(x, t)^(-1) * H(x, t)
-@inline function newton_step_fast(ic::Tuple{ComplexF64, ComplexF64}, t::Float64, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+@inline function newton_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     x = ic
 
-    @inbounds @fastmath for _ in 1:20
+    @inbounds @fastmath for _ in 1:2
         J = Hx_fast(x, t, pi, pf)
         h = H_fast(x, t, pi, pf)
         dx = solve_2x2_fast(J, h)
@@ -189,7 +189,7 @@ end
 
 
 # Path tracker on homotopic continuation from initial root ic to target system pf.
-@inline function track_fast(ic::Tuple{ComplexF64, ComplexF64}, pi::NTuple{7, ComplexF64}, pf::NTuple{7, ComplexF64})
+@inline function track_fast(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     thresh_sq = 1.9^2
     t = 0.0
     dt = 0.1
@@ -315,31 +315,31 @@ end
         #   Circle: x^2 + y^2 - 2bx*x - 2by*y + (bx^2 + by^2 - rad^2) = 0
         #   Line:   uy*x - ux*y + (ux*qy - uy*qx) = 0
         pf = (
-            1.0 + 0.0im,
-            -2.0 * Float64(bx) + 0.0im,
-            -2.0 * Float64(by) + 0.0im,
-            Float64(bx * bx + by * by - rad * rad) + 0.0im,
-            Float64(uy) + 0.0im,
-            -Float64(ux) + 0.0im,
-            Float64(ux * qy - uy * qx) + 0.0im
+            1.0 + 0.0,
+            -2.0 * Float64(bx) + 0.0,
+            -2.0 * Float64(by) + 0.0,
+            Float64(bx * bx + by * by - rad * rad) + 0.0,
+            Float64(uy) + 0.0,
+            -Float64(ux) + 0.0,
+            Float64(ux * qy - uy * qx) + 0.0
         )
 
         # Start system: circle centered along the ray at distance t_proj
         scx = Float64(qx + t_proj * ux)
         scy = Float64(qy + t_proj * uy)
         pi = (
-            1.0 + 0.0im,
-            -2.0 * scx + 0.0im,
-            -2.0 * scy + 0.0im,
-            (scx * scx + scy * scy - Float64(rad * rad)) + 0.0im,
-            Float64(uy) + 0.0im,
-            -Float64(ux) + 0.0im,
-            Float64(ux * qy - uy * qx) + 0.0im
+            1.0 + 0.0,
+            -2.0 * scx + 0.0,
+            -2.0 * scy + 0.0,
+            (scx * scx + scy * scy - Float64(rad * rad)) + 0.0,
+            Float64(uy) + 0.0,
+            -Float64(ux) + 0.0,
+            Float64(ux * qy - uy * qx) + 0.0
         )
 
         # Start roots along the ray
-        r_entry = (ComplexF64(qx + (t_proj - rad) * ux), ComplexF64(qy + (t_proj - rad) * uy))
-        r_exit  = (ComplexF64(qx + (t_proj + rad) * ux), ComplexF64(qy + (t_proj + rad) * uy))
+        r_entry = (Float64(qx + (t_proj - rad) * ux), Float64(qy + (t_proj - rad) * uy))
+        r_exit  = (Float64(qx + (t_proj + rad) * ux), Float64(qy + (t_proj + rad) * uy))
 
         sol1 = track_fast(r_entry, pi, pf)
         sol2 = track_fast(r_exit,  pi, pf)
