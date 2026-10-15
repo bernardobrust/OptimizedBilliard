@@ -1,7 +1,6 @@
 # Deterministic game-sized time series for the DE predictors and Homotopy.
 include("../src/Data.jl")
 include("../src/SimpleSolution.jl")
-include("../src/SimpleSolution.jl")
 include("../src/HomotopySolution.jl")
 include("../src/DESolution.jl")
 include("../src/DEConstantSolution.jl")
@@ -13,6 +12,7 @@ using Printf
 
 const STEP = 1.0 / 120.0
 const FRAMES = 600
+const HIT_KIND = Dict{String,Vector{String}}()
 
 function make_scene()
     n = Int32(16)
@@ -32,7 +32,7 @@ function make_scene()
     Data.DataPlex(UInt64(0), UInt64(1), STEP, 1200f0, 800f0, n, 18f0,
         ball_x, ball_y, ball_vx, ball_vy,
         100f0, 200f0, 16f0, 220f0, 0f0, false, 0f0, 0f0, Int32(1),
-        24f0, -4f0, 0f0, 0f0, 0f0, 0f0, 0f0, 0f0, true,
+        12f0, -4f0, 0f0, 0f0, 0f0, 0f0, 0f0, 0f0, true,
         Ptr{Data.SDL_Window}(C_NULL), Ptr{Data.SDL_Renderer}(C_NULL),
         Ptr{Data.SDL_Texture}(C_NULL), false, Int32(0), :simple,
         Ptr{Data.TTF_Font}(C_NULL), 0.0, 0.0, zeros(100), 1, 1, 100)
@@ -71,11 +71,17 @@ function run_series(name, aim!, mode=nothing)
     DESolution.PREV_DELTA_X[] = 0.0
     DESolution.PREV_DELTA_Y[] = 0.0
     points = Vector{NTuple{2,Float64}}(undef, FRAMES)
+    kinds = Vector{String}(undef, FRAMES)
     for i in 1:FRAMES
         aim!(d, Int32(1))
         points[i] = (Float64(d.collision_x), Float64(d.collision_y))
+        target_x = d.ball_x[1] + d.track_offset_x
+        target_y = d.ball_y[1] + d.track_offset_y
+        target_error_sq = (d.collision_x - target_x)^2 + (d.collision_y - target_y)^2
+        kinds[i] = target_error_sq < 1.0f0 ? "target" : "blocker"
         advance!(d)
     end
+    HIT_KIND[name] = kinds
     return name => points
 end
 
@@ -89,9 +95,9 @@ reference = run_series("Simple reference", SimpleSolution.aim_cue!)
 
 csv_path = joinpath(@__DIR__, "tracked_point_trajectories.csv")
 open(csv_path, "w") do io
-    println(io, "frame,time_s,solution,x,y")
+    println(io, "frame,time_s,solution,hit_kind,x,y")
     for (name, points) in vcat([reference], series), i in eachindex(points)
-        @printf(io, "%d,%.6f,%s,%.6f,%.6f\n", i, (i - 1) * STEP, name, points[i]...)
+        @printf(io, "%d,%.6f,%s,%s,%.6f,%.6f\n", i, (i - 1) * STEP, name, HIT_KIND[name][i], points[i]...)
     end
 end
 
@@ -120,10 +126,19 @@ for (name, points) in series
                 println(io, "<text x=\"$xp\" y=\"$(y0+PLOT_H+18)\" text-anchor=\"middle\" font-size=\"11\">$(second)s</text>")
             end
             for (pts, color, label) in ((reference[2], "#777777", "Simple reference"), (points, colors[name], name))
-                path = join((string(i == 1 ? "M" : "L", " ", round(xpx(i), digits=1), " ", round(ypx(pt[coord]), digits=1)) for (i, pt) in enumerate(pts)), " ")
+                kinds = HIT_KIND[label]
+                path_parts = String[]
+                previous_kind = ""
+                for (i, pt) in enumerate(pts)
+                    command = kinds[i] == previous_kind ? "L" : "M"
+                    push!(path_parts, string(command, " ", round(xpx(i), digits=1), " ", round(ypx(pt[coord]), digits=1)))
+                    previous_kind = kinds[i]
+                end
+                path = join(path_parts, " ")
                 println(io, "<path d=\"$path\" fill=\"none\" stroke=\"$color\" stroke-width=\"2\"/>")
                 println(io, "<text x=\"$(LEFT + (label == "Simple reference" ? 0 : 180))\" y=\"$(y0+PLOT_H+24)\" fill=\"$color\" font-size=\"13\">$label</text>")
             end
+            println(io, "<text x=\"$(LEFT+PLOT_W)\" y=\"$(y0+PLOT_H+24)\" text-anchor=\"end\" fill=\"#555\" font-size=\"11\">break = blocker/target switch</text>")
             println(io, "<text x=\"500\" y=\"$(y0+PLOT_H+43)\" text-anchor=\"middle\" font-size=\"12\">Time (s), 1/120-second frames</text>")
         end
         println(io, "</svg>")

@@ -340,7 +340,8 @@ end
     n::Tuple{Float64,Float64},
     c_start::Tuple{Float64,Float64},
     c_target::Tuple{Float64,Float64},
-    rad::Float64
+    rad::Float64;
+    steps::Int=1
 )::Tuple{Float64,Float64}
     if PREDICTOR_MODE[] == :zero_order
         return newton_step(ic, p, n, c_target, rad)
