@@ -17,7 +17,7 @@ end
 const COLOR_SIMPLE   = "#2E7D32" # Dark green
 const COLOR_HOMOTOPY = "#C2185B" # Deep pink/magenta
 const COLOR_DE_0TH   = "#1976D2" # Blue
-const COLOR_DE_EULER = "#388E3C" # Green
+const COLOR_DE_EULER = "#00897B" # Teal
 const COLOR_DE_RK4   = "#E65100" # Orange
 
 """

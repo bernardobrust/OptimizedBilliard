@@ -51,13 +51,17 @@ end
         A = a * (e^2 + f^2)
         B = 2 * a * e * g + b * f^2 - c * e * f
         C = a * g^2 - c * f * g + d * f^2
-        disc = sqrt(B^2 - 4 * A * C)
+        disc = sqrt(Complex(B^2 - 4 * A * C))
         x1 = (-B + disc) / (2 * A)
         y1 = -(e * x1 + g) / f
         x2 = (-B - disc) / (2 * A)
         y2 = -(e * x2 + g) / f
 
-        return [Float64[x1, y1], Float64[x2, y2]]
+        if imag(x1) == 0.0 && imag(y1) == 0.0 && imag(x2) == 0.0 && imag(y2) == 0.0
+            return [Float64[real(x1), real(y1)], Float64[real(x2), real(y2)]]
+        else
+            return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
+        end
     else
         A = a * (e^2 + f^2)
         B = 2 * a * f * g + c * e^2 - b * e * f
@@ -68,7 +72,11 @@ end
         y2 = (-B - disc) / (2 * A)
         x2 = -(f * y2 + g) / e
 
-        return [Float64[x1, y1], Float64[x2, y2]]
+        if imag(x1) == 0.0 && imag(y1) == 0.0 && imag(x2) == 0.0 && imag(y2) == 0.0
+            return [Float64[real(x1), real(y1)], Float64[real(x2), real(y2)]]
+        else
+            return [ComplexF64[x1, y1], ComplexF64[x2, y2]]
+        end
     end
 end
 
@@ -123,7 +131,7 @@ end
     detJ = j11 * j22 - j12 * j21
 
     if abs(detJ) < 1e-15
-        detJ = 1e-15 + 0.0
+        detJ = detJ >= 0.0 ? 1e-15 : -1e-15
     end
 
     invdet = 1.0 / detJ
@@ -227,6 +235,8 @@ end
 
     return newton_step_fast(curr, 1.0, pi, pf)
 end
+
+@inline track(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}) = track_fast(ic, pi, pf)
 
 # Integration with the system
 @inline @fastmath function aim_cue!(data, sid::Int32)
@@ -345,9 +355,10 @@ end
         sol2 = track_fast(r_exit,  pi, pf)
 
         @inbounds @fastmath for sol in (sol1, sol2)
-            if abs(imag(sol[1])) < 1.0 && abs(imag(sol[2])) < 1.0
-                rx = Float32(real(sol[1]))
-                ry = Float32(real(sol[2]))
+            f1, f2 = fn_fast(sol, pf)
+            if (f1 * f1 + f2 * f2) < 1.0
+                rx = Float32(sol[1])
+                ry = Float32(sol[2])
                 t_hit = (rx - qx) * ux + (ry - qy) * uy
 
                 if t_hit > 0.0f0 && t_hit < t_min

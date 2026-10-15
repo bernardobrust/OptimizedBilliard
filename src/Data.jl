@@ -49,7 +49,7 @@ mutable struct DataPlex
     # Pause system
     paused::Bool
 
-    # Solution mode (:simple or :homotopy)
+    # Solution mode (:simple, :homotopy, :de_constant, :de_euler, or :de_rk4)
     sol_id::Int32
     current_solution::Symbol
 

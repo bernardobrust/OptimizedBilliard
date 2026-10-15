@@ -76,7 +76,7 @@ function set_predictor_mode!(mode::Symbol)
     end
 end
 
-# 0th-order prediction extrapolates the previous tracked-point displacement.
+# 1st-order Euler predictor along the Davidenko differential equation followed by Newton-Raphson correction
 @inline @fastmath function track_euler(
     x::Tuple{Float64,Float64}, p::Tuple{Float64,Float64}, dp_dt::Tuple{Float64,Float64},
     n::Tuple{Float64,Float64}, dn_dt::Tuple{Float64,Float64}, c::Tuple{Float64,Float64},
@@ -328,6 +328,7 @@ end
 
 # Continuation path tracking for a root `ic` from start circle `c_start` to target circle `c_target`.
 # In :rk4 mode, integrates Davidenko DE dx/ds = - J⁻¹ (∂f/∂s) using RK4 followed by Newton correction.
+# In :euler mode, integrates Davidenko DE dx/ds = - J⁻¹ (∂f/∂s) using 1st-order Euler predictor followed by Newton correction.
 # In :zero_order mode, uses constant prediction followed by Newton correction.
 @inline @fastmath function track_continuation(
     ic::Tuple{Float64,Float64},
@@ -341,6 +342,14 @@ end
 )::Tuple{Float64,Float64}
     if PREDICTOR_MODE[] == :zero_order
         return newton_step(ic, p, n, c_target, rad)
+    elseif PREDICTOR_MODE[] == :euler
+        dc_ds = (c_target[1] - c_start[1], c_target[2] - c_start[2])
+        ds = 1.0 / Float64(steps)
+        J = jacobian(ic, n, c_start)
+        f_s = (0.0, -2.0 * ((ic[1] - c_start[1]) * dc_ds[1] + (ic[2] - c_start[2]) * dc_ds[2]))
+        sol = solve_2x2(J, f_s)
+        x_pred = (ic[1] - sol[1] * ds, ic[2] - sol[2] * ds)
+        return newton_step(x_pred, p, n, c_target, rad)
     end
 
     dc_ds = (c_target[1] - c_start[1], c_target[2] - c_start[2])
@@ -616,9 +625,12 @@ end
         end
     end
 
-    if prev_sol[1] != 0.0
+    if prev_sol[1] != 0.0 && best_hit_id != 0 && best_hit_id == prev_ball_id
         PREV_DELTA_X[] = Float64(hit_x) - prev_sol[1]
         PREV_DELTA_Y[] = Float64(hit_y) - prev_sol[2]
+    else
+        PREV_DELTA_X[] = 0.0
+        PREV_DELTA_Y[] = 0.0
     end
 
     data.collision_x = hit_x

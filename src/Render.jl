@@ -3,7 +3,7 @@ module Render
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
-# Precaulculated is not really worth it
+# Precalculated is not really worth it
 const RADIUS = 18
 const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(RADIUS*RADIUS - dy^2))) for dy in -RADIUS:RADIUS]
 

@@ -51,12 +51,12 @@ end
         if evt.type == SDL_QUIT
             return false
 
-            # Workoround for reated space keys
+            # Workaround for repeated space keys
         elseif evt.type == SDL_KEYDOWN
             if evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.key.repeat == 0
                 data.paused = !data.paused
             elseif evt.key.keysym.scancode == SDL_SCANCODE_S && evt.key.repeat == 0
-				data.sol_id += 1
+                data.sol_id += 1
                 data.sol_id %= 5
                 if data.sol_id == 0
                     data.current_solution = :simple
@@ -67,6 +67,7 @@ end
                     DESolution.set_predictor_mode!(:zero_order)
                 elseif data.sol_id == 3
                     data.current_solution = :de_euler
+                    DESolution.set_predictor_mode!(:euler)
                 elseif data.sol_id == 4
                     data.current_solution = :de_rk4
                     DESolution.set_predictor_mode!(:rk4)
@@ -131,9 +132,6 @@ end
 
     # Quit
     Input.is_down(SDL_SCANCODE_ESCAPE) && return false
-
-    # Pause
-    Input.is_down(SDL_SCANCODE_SPACE) && (data.paused = !data.paused)
 
     # We need this interaction to happen even if the game is paused
 

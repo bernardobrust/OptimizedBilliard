@@ -243,8 +243,10 @@ function run_all_benchmarks()
     scenario_data["DE (RK4)"][1] = benchmark_func(DERK4Solution.aim_cue!, d_clear, Int32(1))
     scenario_data["Homotopy"][1] = benchmark_func(HomotopySolution.aim_cue!, d_clear, Int32(1))
 
-    # Scenario 2: Blocked LOS (16 balls, single direct blocker)
+    # Scenario 2: Blocked LOS (16 balls, stationary target line with crossing blocker)
     d_blocked = create_data(Int32(16); blocked=true)
+    d_blocked.ball_vx[1] = 0.0f0
+    d_blocked.ball_vy[1] = 0.0f0
     scenario_data["Simple"][2] = benchmark_func(SimpleSolution.aim_cue!, d_blocked, Int32(1))
     scenario_data["DE (Constant)"][2] = benchmark_func(DEConstantSolution.aim_cue!, d_blocked, Int32(1))
     scenario_data["DE (Euler)"][2] = benchmark_func(DEEulerSolution.aim_cue!, d_blocked, Int32(1))

@@ -65,9 +65,9 @@ julia -O3 -g0 main.jl
 - **S Key**: Cycle through aiming calculation methods:
   - `Simple`: Closed-form geometric quadratic line-circle solver.
   - `Homotopy`: Polynomial homotopy path tracking.
-  - `DE (Constant)`: Davidenko differential continuation with frame-to-frame temporal tracking and Newton displacement collision detection.
-  - `DE (Euler)`: First-order Euler prediction followed by Newton correction.
-  - `DE (RK4)`: 4th-order Runge-Kutta numerical integration of the Davidenko vector field.
+  - `DE (Constant)`: Zero-order continuation with frame-to-frame temporal tracking and Newton displacement collision detection (bypasses differential equation integration).
+  - `DE (Euler)`: First-order Euler prediction along the Davidenko differential equation followed by Newton correction.
+  - `DE (RK4)`: 4th-order Runge-Kutta numerical integration of the Davidenko vector field followed by Newton correction.
 - **Escape**: Exit application.
 
 ## Experiments and Results
@@ -76,9 +76,25 @@ Run `julia experiments/benchmark.jl` to regenerate the benchmark SVGs, or `julia
 
 ### Benchmark Results
 
-The benchmark confirms that Simple is the cheapest method for this small two-dimensional line-circle problem. Its ray checks use direct geometric calculations. The DE methods add prediction and correction work, while Homotopy tracks polynomial roots through a continuation path. For this problem, those costs outweigh any savings from temporal tracking.
+The benchmark confirms that Simple is typically a very cheap baseline method for this small two-dimensional line-circle problem, as its ray checks use direct geometric calculations. The DE methods add predictor-corrector logic, while Homotopy tracks polynomial roots through a continuation path.
 
-The latest 16-ball run measured approximately 243 ns/update for Simple, 348 ns for DE 0th, 358 ns for DE Euler, 378 ns for DE RK4, and 653 ns for Homotopy. These figures vary by machine and runtime; the plots show the full scaling and scenario measurements.
+Across multiple benchmark runs, it can sometimes be the case that the DE methods are faster than the simple solution (particularly when temporal fast paths succeed and bypass checking other balls), but it is **never** the case that Homotopy is faster:
+
+```text
+-----------------------------------------------------------------
+SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):
+-----------------------------------------------------------------
+| Solution         | Update (ns) | Relative latency |
+|:-----------------|------------:|-----------------:|
+| Simple           |       257.6 |             1.00x |
+| DE (Constant)    |       262.2 |             1.02x |
+| DE (Euler)       |       232.8 |             0.90x |
+| DE (RK4)         |       256.1 |             0.99x |
+| Homotopy         |       538.4 |             2.09x |
+-----------------------------------------------------------------
+```
+
+These figures vary by machine and runtime; the plots below show the full scaling and scenario measurements.
 
 ![Update latency as the number of balls increases](experiments/results_ball_scaling.svg)
 
@@ -127,18 +143,21 @@ When `tracked_fast` succeeds, no continuation paths are tracked, no linear syste
 #### 2. Exact Numerical Zeros and RK4's High-Order Accuracy
 RK4 integrates the Davidenko differential equation along the physical trajectory of the moving ball:
 $$\frac{dx}{dt} = - J(x)^{-1} \frac{\partial f}{\partial t}$$
-- **Numerical Zeros in Ray Derivatives**: The cue pivot and sightline normal vector are stationary during aiming ($dp/dt = (0, 0)$ and $dn/dt = (0, 0)$). In the partial derivative vector $\partial f / \partial t$, the line constraint error derivative is an exact numerical zero:
-  $$\frac{\partial f_1}{\partial t} = \left(\frac{dn}{dt}\right)^T (x - p) - n^T \frac{dp}{dt} \equiv 0.0$$
-  Because this component is identically zero, solving $J \frac{dx}{dt} = -\frac{\partial f}{\partial t}$ mathematically guarantees that $n^T \frac{dx}{dt} = 0$. The predicted velocity $dx/dt$ is **strictly collinear with the line-of-sight unit vector $u$**.
-- **$O(\Delta t^5)$ Local Precision**: Because the ball moves with constant velocity between bounces, RK4 tracks this 1D constraint with fourth-order Runge-Kutta accuracy (local error $O(\Delta t^5) \approx 10^{-11}$ at $\Delta t = 1/120\text{ s}$). The predicted point $x_{pred}$ lands so close to the true perimeter that the subsequent Newton correction displacement is a **numerical zero** ($\approx 0.0$).
+- **Ray Derivatives and Line-of-Sight Kinematics**:
+  - When the aiming direction is fixed ($sid == 0$ or stationary cue), $dp/dt = (0, 0)$ and $dn/dt = (0, 0)$. In the partial derivative vector $\partial f / \partial t$, the line constraint error derivative is an exact numerical zero:
+    $$\frac{\partial f_1}{\partial t} = \left(\frac{dn}{dt}\right)^T (x - p) - n^T \frac{dp}{dt} \equiv 0.0$$
+    Because this component is identically zero, solving $J \frac{dx}{dt} = -\frac{\partial f}{\partial t}$ mathematically guarantees that $n^T \frac{dx}{dt} = 0$. The predicted velocity $dx/dt$ is **strictly collinear with the line-of-sight unit vector $u$**, reducing along the ray to:
+    $$\frac{dx}{dt} = \left( \frac{(x - c)^T \dot{c}}{(x - c)^T u} \right) u$$
+  - When dynamically aiming at a moving target ball ($sid \ne 0$), the line of sight rotates with angular velocity $\dot{n} = (\dot{u}_y, -\dot{u}_x)$, where $\dot{u} = \frac{v_{\text{target}} - (v_{\text{target}} \cdot u)u}{\|V\|}$, which the Davidenko vector field accounts for in $\partial f_1 / \partial t$.
+- **$O(\Delta t^5)$ Local Precision**: Because the ball moves with constant velocity between bounces, RK4 tracks the constraint with fourth-order Runge-Kutta accuracy (local truncation error $O(\Delta t^5) \approx 10^{-11}$ at $\Delta t = 1/120\text{ s}$). The predicted point $x_{pred}$ lands so close to the true perimeter that the subsequent Newton correction displacement is practically negligible.
 - As a result, `newton_move_sq < 0.25` and `err_sq < 1e-4` pass effortlessly on every frame, achieving nearly a **100% fast-path hit rate** in active gameplay.
 
 #### 3. Why Constant (0-th Order) Frequently Drops Out of the Fast Path
-Constant uses linear finite-difference extrapolation from the previous frame (`x_pred = prev_sol + PREV_DELTA`). In real gameplay, it frequently fails the strict $0.25\text{ px}^2$ ($0.5\text{ px}$) threshold:
-- **Zero-Delta Initialization Bug**: On the first frame a blocker appears, `prev_sol[1] == 0.0`, preventing `PREV_DELTA` from updating. On the following frame, Constant predicts zero displacement (`x_pred = prev_sol`). At $140\text{ px/s}$, the ball moves $\sim 1.17\text{ px}$ in one frame, requiring a Newton shift of $1.17\text{ px}$ (`newton_move_sq` $\approx 1.37 > 0.25$), instantly failing the fast path.
+Constant uses 0th-order position holding / linear finite-difference extrapolation from the previous frame (`x_pred = prev_sol + PREV_DELTA`). It bypasses Davidenko differential equations entirely. In real gameplay, it frequently fails the strict $0.25\text{ px}^2$ ($0.5\text{ px}$) fast-path threshold:
+- **Zero-Order Step Lag on Blocker Appearance**: On the first frame a blocker appears, previous delta is uninitialized (`PREV_DELTA == 0.0`), predicting zero displacement (`x_pred = prev_sol`). At $140\text{ px/s}$, the ball moves $\sim 1.17\text{ px}$ in one frame, requiring a Newton shift of $1.17\text{ px}$ (`newton_move_sq` $\approx 1.37 > 0.25$), instantly failing the fast path.
 - **Nonlinear Chord Acceleration**: As a circle moves across a ray, the intersection distance $t(t) = t_{proj}(t) - \sqrt{R^2 - d_\perp(t)^2}$ accelerates nonlinearly ($\ddot{t} \ne 0$). Constant linear extrapolation ignores this curvature ($\frac{1}{2}\ddot{x}\Delta t^2$), frequently exceeding the $0.25$ movement or $10^{-4}$ residual limit near entry and graze angles.
 - **Fixed-Rate Accumulator Repeats**: In `Update.update_aim_at_fixed_rate!`, when frame drops cause multiple aim iterations per frame, physics does not advance between sub-steps. Constant blindly applies `PREV_DELTA` to stationary balls, requiring Newton to undo the offset, blowing up `newton_move_sq` and dropping out of the fast path.
-- Whenever Constant misses the fast path, it falls back to the full $O(N)$ candidate loop and evaluates `track_continuation` on entry and exit roots.
+- Whenever Constant misses the fast path, it falls back to the full $O(N)$ candidate loop and evaluates `track_continuation` on candidate roots.
 
 #### 4. Why the Benchmark Hides This
 1. **Physics Overhead Masks Solvers**: The benchmark measures `step!() = (advance_game_physics!(data); f!(data, sid))`. The $O(N^2)$ pairwise collision physics takes $\sim 180\text{ ns}$ out of the total $\sim 230\text{--}340\text{ ns}$, compressing the visible solver latency gap.

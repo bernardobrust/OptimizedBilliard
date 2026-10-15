@@ -101,7 +101,7 @@ open(csv_path, "w") do io
     end
 end
 
-colors = Dict("DE 0th" => "#1976D2", "DE Euler" => "#388E3C", "DE RK4" => "#E65100", "Homotopy" => "#C2185B")
+colors = Dict("DE 0th" => "#1976D2", "DE Euler" => "#00897B", "DE RK4" => "#E65100", "Homotopy" => "#C2185B")
 const WIDTH, HEIGHT, LEFT, TOP, PLOT_W, PLOT_H = 1000, 700, 85, 55, 850, 255
 for (name, points) in series
     svg_path = joinpath(@__DIR__, "tracked_point_$(replace(lowercase(name), ' ' => '_')).svg")
