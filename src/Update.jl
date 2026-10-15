@@ -13,6 +13,7 @@ using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
 const AIM_ALGORITHM_DT = 1.0 / 120.0
+const AIM_ACCUMULATOR = Ref(0.0)
 
 @inline function aim_cue!(data, sid::Int32)
     DESolution.set_algorithmic_dt!(AIM_ALGORITHM_DT)
@@ -26,6 +27,19 @@ const AIM_ALGORITHM_DT = 1.0 / 120.0
         DEEulerSolution.aim_cue!(data, sid)
     else
         DERK4Solution.aim_cue!(data, sid)
+    end
+end
+
+@inline function update_aim_at_fixed_rate!(data, elapsed::Float32)
+    if data.selected_ball_id == 0 && !data.has_aim
+        AIM_ACCUMULATOR[] = 0.0
+        return
+    end
+
+    AIM_ACCUMULATOR[] += Float64(elapsed)
+    while AIM_ACCUMULATOR[] >= AIM_ALGORITHM_DT
+        aim_cue!(data, data.selected_ball_id)
+        AIM_ACCUMULATOR[] -= AIM_ALGORITHM_DT
     end
 end
 
@@ -58,9 +72,6 @@ end
                     DESolution.set_predictor_mode!(:rk4)
                 end
 
-                if data.selected_ball_id != 0 || data.has_aim
-                    aim_cue!(data, data.selected_ball_id)
-                end
             else
                 Input.handle_key(true, evt.key.keysym.scancode)
             end
@@ -166,9 +177,6 @@ end
                 data.target_x = mx
                 data.target_y = my
                 data.has_aim = true
-
-                aim_cue!(data, clicked_ball_id)
-
             else
                 # Fixed direction clicked in empty space
                 cdx = mx - data.cue_x
@@ -183,13 +191,9 @@ end
                     data.track_offset_y = 0.0f0
                     data.selected_ball_id = Int32(0)
                     data.has_aim = true
-
-                    aim_cue!(data, Int32(0))
                 end
             end
         end
-    elseif data.selected_ball_id != 0 || data.has_aim
-        aim_cue!(data, data.selected_ball_id)
     end
 
     if !Input.mouse_left_down()
@@ -197,13 +201,14 @@ end
     elseif data.dragging_cue
         data.cue_x = mx - data.drag_offset_x
         data.cue_y = my - data.drag_offset_y
-        if data.selected_ball_id != 0 || data.has_aim
-            aim_cue!(data, data.selected_ball_id)
-        end
     end
 
     # Do not run code after this if the game is paused
-    data.paused && (Input.end_frame(); return true)
+    if data.paused
+        update_aim_at_fixed_rate!(data, Float32(raw_dt))
+        Input.end_frame()
+        return true
+    end
 
     # Ball motion and wall reflection
     # @TODO: randomize speed to check predictor stability
@@ -287,13 +292,9 @@ end
         data.ball_vy[i] = vy1
     end
 
-    # Geometric interpretation (Post-integration re-alignment):
-    # Ball positions have updated during this physics step (integration + collisions).
-    # Re-evaluating aim_cue! here eliminates any 1-frame latency between the moving ball's
-    # tracked contact point and the cue orientation before rendering.
-    if !data.paused && (data.selected_ball_id != 0 || data.has_aim)
-        aim_cue!(data, data.selected_ball_id)
-    end
+    # Aiming has its own fixed 120 Hz cadence; physics, input, and rendering remain
+    # tied to the frame rate.
+    update_aim_at_fixed_rate!(data, Float32(raw_dt))
 
     Input.end_frame()
     true

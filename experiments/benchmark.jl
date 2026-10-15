@@ -134,8 +134,8 @@ function benchmark_func(f!, source_data, sid::Int32; reps::Int=REPETITIONS)
     data = deepcopy(source_data)
     initial_x, initial_y = copy(data.ball_x), copy(data.ball_y)
     initial_vx, initial_vy = copy(data.ball_vx), copy(data.ball_vy)
-    # The game aims before physics and realigns once more after physics.
-    step!() = (f!(data, sid); advance_game_physics!(data); f!(data, sid))
+    # Match the game's fixed-rate aiming update: advance physics, then aim once.
+    step!() = (advance_game_physics!(data); f!(data, sid))
     reset!() = begin
         copyto!(data.ball_x, initial_x); copyto!(data.ball_y, initial_y)
         copyto!(data.ball_vx, initial_vx); copyto!(data.ball_vy, initial_vy)
