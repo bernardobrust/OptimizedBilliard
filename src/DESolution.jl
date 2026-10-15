@@ -62,16 +62,31 @@ export aim_cue!
 
 # Global tracking state for frame-to-frame continuation
 const PREV_TRACKED_BALL = Ref{Int32}(Int32(0))
-const PREDICTOR_MODE = Ref{Symbol}(:zero_order) # :rk4 or :zero_order
+const PREDICTOR_MODE = Ref{Symbol}(:zero_order) # :zero_order, :euler, or :rk4
 const PREV_DELTA_X = Ref{Float64}(0.0)
 const PREV_DELTA_Y = Ref{Float64}(0.0)
+const ALGORITHMIC_DT = Ref{Float64}(1.0 / 120.0)
+set_algorithmic_dt!(dt::Real) = (ALGORITHMIC_DT[] = Float64(dt))
 
 function set_predictor_mode!(mode::Symbol)
-    if mode in (:rk4, :zero_order)
+    if mode in (:rk4, :zero_order, :euler)
         PREDICTOR_MODE[] = mode
     else
-        error("Invalid predictor mode: $mode. Expected :rk4 or :zero_order")
+        error("Invalid predictor mode: $mode. Expected :rk4, :euler, or :zero_order")
     end
+end
+
+# 0th-order prediction extrapolates the previous tracked-point displacement.
+@inline @fastmath function track_euler(
+    x::Tuple{Float64,Float64}, p::Tuple{Float64,Float64}, dp_dt::Tuple{Float64,Float64},
+    n::Tuple{Float64,Float64}, dn_dt::Tuple{Float64,Float64}, c::Tuple{Float64,Float64},
+    dc_dt::Tuple{Float64,Float64}, rad::Float64, dt::Float64
+)
+    x_pred = euler_step(x, p, dp_dt, n, dn_dt, c, dc_dt, dt)
+    p_next = (p[1] + dp_dt[1] * dt, p[2] + dp_dt[2] * dt)
+    n_next = (n[1] + dn_dt[1] * dt, n[2] + dn_dt[2] * dt)
+    c_next = (c[1] + dc_dt[1] * dt, c[2] + dc_dt[2] * dt)
+    return newton_step(x_pred, p_next, n_next, c_next, rad)
 end
 
 function get_predictor_mode()::Symbol
@@ -182,23 +197,14 @@ end
     p::Tuple{Float64,Float64},
     n::Tuple{Float64,Float64},
     c::Tuple{Float64,Float64},
-    rad::Float64;
-    max_iters::Int=2
+    rad::Float64
 )::Tuple{Float64,Float64}
     curr = x
 
-    # Unrolled for 2 iterations
     f = f_error(curr, p, n, c, rad)
     J = jacobian(curr, n, c)
     dx = solve_2x2(J, f)
     curr = (curr[1] - dx[1], curr[2] - dx[2])
-
-    if max_iters > 1
-        f = f_error(curr, p, n, c, rad)
-        J = jacobian(curr, n, c)
-        dx = solve_2x2(J, f)
-        curr = (curr[1] - dx[1], curr[2] - dx[2])
-    end
 
     return curr
 end
@@ -313,6 +319,8 @@ end
 )::Tuple{Float64,Float64}
     if PREDICTOR_MODE[] == :rk4
         return track_rk4(x, p, dp_dt, n, dn_dt, c, dc_dt, rad, dt)
+    elseif PREDICTOR_MODE[] == :euler
+        return track_euler(x, p, dp_dt, n, dn_dt, c, dc_dt, rad, dt)
     else
         p_next = (p[1] + dp_dt[1] * dt, p[2] + dp_dt[2] * dt)
         n_next = (n[1] + dn_dt[1] * dt, n[2] + dn_dt[2] * dt)
@@ -332,8 +340,7 @@ end
     n::Tuple{Float64,Float64},
     c_start::Tuple{Float64,Float64},
     c_target::Tuple{Float64,Float64},
-    rad::Float64;
-    steps::Int=1
+    rad::Float64
 )::Tuple{Float64,Float64}
     if PREDICTOR_MODE[] == :zero_order
         return newton_step(ic, p, n, c_target, rad)
@@ -344,46 +351,44 @@ end
     ds = 1.0 / Float64(steps)
     s = 0.0
 
-    @inbounds for _ in 1:steps
-        ds2 = ds * 0.5
-        c_s = (c_start[1] + s * dc_ds[1], c_start[2] + s * dc_ds[2])
-        c_mid = (c_start[1] + (s + ds2) * dc_ds[1], c_start[2] + (s + ds2) * dc_ds[2])
-        c_next = (c_start[1] + (s + ds) * dc_ds[1], c_start[2] + (s + ds) * dc_ds[2])
+    ds2 = ds * 0.5
+    c_s = (c_start[1] + s * dc_ds[1], c_start[2] + s * dc_ds[2])
+    c_mid = (c_start[1] + (s + ds2) * dc_ds[1], c_start[2] + (s + ds2) * dc_ds[2])
+    c_next = (c_start[1] + (s + ds) * dc_ds[1], c_start[2] + (s + ds) * dc_ds[2])
 
-        # Davidenko RHS along continuation parameter s:
-        # f₁(x, s) = nᵀ (x - p) => ∂f₁/∂s = 0
-        # f₂(x, s) = ||x - c(s)||² - rad² => ∂f₂/∂s = -2 (x - c(s))ᵀ (dc/ds)
-        J1 = jacobian(x_curr, n, c_s)
-        f_s1 = (0.0, -2.0 * ((x_curr[1] - c_s[1]) * dc_ds[1] + (x_curr[2] - c_s[2]) * dc_ds[2]))
-        sol1 = solve_2x2(J1, f_s1)
-        k1 = (-sol1[1], -sol1[2])
+    # Davidenko RHS along continuation parameter s:
+    # f₁(x, s) = nᵀ (x - p) => ∂f₁/∂s = 0
+    # f₂(x, s) = ||x - c(s)||² - rad² => ∂f₂/∂s = -2 (x - c(s))ᵀ (dc/ds)
+    J1 = jacobian(x_curr, n, c_s)
+    f_s1 = (0.0, -2.0 * ((x_curr[1] - c_s[1]) * dc_ds[1] + (x_curr[2] - c_s[2]) * dc_ds[2]))
+    sol1 = solve_2x2(J1, f_s1)
+    k1 = (-sol1[1], -sol1[2])
 
-        x2 = (x_curr[1] + k1[1] * ds2, x_curr[2] + k1[2] * ds2)
-        J2 = jacobian(x2, n, c_mid)
-        f_s2 = (0.0, -2.0 * ((x2[1] - c_mid[1]) * dc_ds[1] + (x2[2] - c_mid[2]) * dc_ds[2]))
-        sol2 = solve_2x2(J2, f_s2)
-        k2 = (-sol2[1], -sol2[2])
+    x2 = (x_curr[1] + k1[1] * ds2, x_curr[2] + k1[2] * ds2)
+    J2 = jacobian(x2, n, c_mid)
+    f_s2 = (0.0, -2.0 * ((x2[1] - c_mid[1]) * dc_ds[1] + (x2[2] - c_mid[2]) * dc_ds[2]))
+    sol2 = solve_2x2(J2, f_s2)
+    k2 = (-sol2[1], -sol2[2])
 
-        x3 = (x_curr[1] + k2[1] * ds2, x_curr[2] + k2[2] * ds2)
-        J3 = jacobian(x3, n, c_mid)
-        f_s3 = (0.0, -2.0 * ((x3[1] - c_mid[1]) * dc_ds[1] + (x3[2] - c_mid[2]) * dc_ds[2]))
-        sol3 = solve_2x2(J3, f_s3)
-        k3 = (-sol3[1], -sol3[2])
+    x3 = (x_curr[1] + k2[1] * ds2, x_curr[2] + k2[2] * ds2)
+    J3 = jacobian(x3, n, c_mid)
+    f_s3 = (0.0, -2.0 * ((x3[1] - c_mid[1]) * dc_ds[1] + (x3[2] - c_mid[2]) * dc_ds[2]))
+    sol3 = solve_2x2(J3, f_s3)
+    k3 = (-sol3[1], -sol3[2])
 
-        x4 = (x_curr[1] + k3[1] * ds, x_curr[2] + k3[2] * ds)
-        J4 = jacobian(x4, n, c_next)
-        f_s4 = (0.0, -2.0 * ((x4[1] - c_next[1]) * dc_ds[1] + (x4[2] - c_next[2]) * dc_ds[2]))
-        sol4 = solve_2x2(J4, f_s4)
-        k4 = (-sol4[1], -sol4[2])
+    x4 = (x_curr[1] + k3[1] * ds, x_curr[2] + k3[2] * ds)
+    J4 = jacobian(x4, n, c_next)
+    f_s4 = (0.0, -2.0 * ((x4[1] - c_next[1]) * dc_ds[1] + (x4[2] - c_next[2]) * dc_ds[2]))
+    sol4 = solve_2x2(J4, f_s4)
+    k4 = (-sol4[1], -sol4[2])
 
-        x_pred = (
-            x_curr[1] + (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]) * ds * (1.0 / 6.0),
-            x_curr[2] + (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) * ds * (1.0 / 6.0)
-        )
+    x_pred = (
+        x_curr[1] + (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]) * ds * (1.0 / 6.0),
+        x_curr[2] + (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) * ds * (1.0 / 6.0)
+    )
 
-        x_curr = newton_step(x_pred, p, n, c_next, rad)
-        s += ds
-    end
+    x_curr = newton_step(x_pred, p, n, c_next, rad)
+    s += ds
 
     return x_curr
 end
@@ -493,7 +498,7 @@ end
 
     rad = Float64(data.ball_radius)
     rad_sq = rad * rad
-    dt = Float64(data.dt_target)
+    dt = ALGORITHMIC_DT[]
 
     # LOS Ray parameters
     p = (Float64(qx), Float64(qy))
@@ -518,12 +523,16 @@ end
         c_now = (bx, by)
 
         # Predict position: assume delta from previous frame is the same (or RK4)
-        if PREDICTOR_MODE[] == :rk4
+        if PREDICTOR_MODE[] == :rk4 || PREDICTOR_MODE[] == :euler
             b_vx = Float64(data.ball_vx[j])
             b_vy = Float64(data.ball_vy[j])
             dc_dt = (b_vx, b_vy)
             c_prev = (bx - b_vx * dt, by - b_vy * dt)
-            x_pred = rk4_step(prev_sol, p, dp_dt, n, dn_dt, c_prev, dc_dt, dt)
+            if PREDICTOR_MODE[] == :rk4
+                x_pred = rk4_step(prev_sol, p, dp_dt, n, dn_dt, c_prev, dc_dt, dt)
+            else
+                x_pred = euler_step(prev_sol, p, dp_dt, n, dn_dt, c_prev, dc_dt, dt)
+            end
         else
             x_pred = (prev_sol[1] + PREV_DELTA_X[], prev_sol[2] + PREV_DELTA_Y[])
         end

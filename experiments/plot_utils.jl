@@ -2,10 +2,22 @@ module PlotUtils
 
 using Printf
 
+function maybe_convert_png(out_svg::String)
+    converter = Sys.which("rsvg-convert")
+    if converter === nothing
+        @warn "rsvg-convert is not installed; leaving the generated SVG without a PNG copy" out_svg
+        return
+    end
+    out_png = replace(out_svg, ".svg" => ".png")
+    run(`$converter -f png -d 150 -p 150 -o $out_png $out_svg`)
+    println("Generated: $out_svg and $out_png")
+end
+
 # Color palette for solutions
 const COLOR_SIMPLE   = "#2E7D32" # Dark green
 const COLOR_HOMOTOPY = "#C2185B" # Deep pink/magenta
 const COLOR_DE_0TH   = "#1976D2" # Blue
+const COLOR_DE_EULER = "#388E3C" # Green
 const COLOR_DE_RK4   = "#E65100" # Orange
 
 """
@@ -114,9 +126,7 @@ function plot_line(
     println(io, "</svg>")
 
     write(out_svg, String(take!(io)))
-    out_png = replace(out_svg, ".svg" => ".png")
-    run(`rsvg-convert -f png -d 150 -p 150 -o $out_png $out_svg`)
-    println("Generated: $out_svg and $out_png")
+    maybe_convert_png(out_svg)
 end
 
 """
@@ -213,9 +223,7 @@ function plot_grouped_bar(
     println(io, "</svg>")
 
     write(out_svg, String(take!(io)))
-    out_png = replace(out_svg, ".svg" => ".png")
-    run(`rsvg-convert -f png -d 150 -p 150 -o $out_png $out_svg`)
-    println("Generated: $out_svg and $out_png")
+    maybe_convert_png(out_svg)
 end
 
 end # module PlotUtils

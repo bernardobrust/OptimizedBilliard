@@ -155,6 +155,8 @@ end
         sol_str = "Sol: Homotopy"
     elseif data.current_solution == :de_constant
         sol_str = "Sol: DE (Constant)"
+    elseif data.current_solution == :de_euler
+        sol_str = "Sol: DE (Euler)"
     else
         sol_str = "Sol: DE (RK4)"
     end

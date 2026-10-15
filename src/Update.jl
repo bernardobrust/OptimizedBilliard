@@ -5,21 +5,27 @@ include("Input.jl")
 include("SimpleSolution.jl")
 include("HomotopySolution.jl")
 include("DESolution.jl")
+include("DEConstantSolution.jl")
+include("DEEulerSolution.jl")
+include("DERK4Solution.jl")
 
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
+const AIM_ALGORITHM_DT = 1.0 / 120.0
+
 @inline function aim_cue!(data, sid::Int32)
+    DESolution.set_algorithmic_dt!(AIM_ALGORITHM_DT)
     if data.current_solution == :simple
         SimpleSolution.aim_cue!(data, sid)
     elseif data.current_solution == :homotopy
         HomotopySolution.aim_cue!(data, sid)
     elseif data.current_solution == :de_constant
-        DESolution.set_predictor_mode!(:zero_order)
-        DESolution.aim_cue!(data, sid)
+        DEConstantSolution.aim_cue!(data, sid)
+    elseif data.current_solution == :de_euler
+        DEEulerSolution.aim_cue!(data, sid)
     else
-        DESolution.set_predictor_mode!(:rk4)
-        DESolution.aim_cue!(data, sid)
+        DERK4Solution.aim_cue!(data, sid)
     end
 end
 
@@ -37,7 +43,7 @@ end
                 data.paused = !data.paused
             elseif evt.key.keysym.scancode == SDL_SCANCODE_S && evt.key.repeat == 0
 				data.sol_id += 1
-                data.sol_id %= 4
+                data.sol_id %= 5
                 if data.sol_id == 0
                     data.current_solution = :simple
                 elseif data.sol_id == 1
@@ -45,7 +51,9 @@ end
                 elseif data.sol_id == 2
                     data.current_solution = :de_constant
                     DESolution.set_predictor_mode!(:zero_order)
-                else
+                elseif data.sol_id == 3
+                    data.current_solution = :de_euler
+                elseif data.sol_id == 4
                     data.current_solution = :de_rk4
                     DESolution.set_predictor_mode!(:rk4)
                 end

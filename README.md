@@ -73,26 +73,13 @@ julia -O3 -g0 main.jl
 
 To evaluate the computational efficiency and operational trade-offs of each method, an automated benchmark suite was developed in [experiments/benchmark.jl](experiments/benchmark.jl). The benchmarks evaluate the solvers across scaling ball counts and diverse physical scenarios over 15,000 iterations per test, generating plots natively in Julia via [experiments/plot_utils.jl](experiments/plot_utils.jl).
 
-### Summary: Standard 16-Ball Match
-
-The table below summarizes the throughput and per-frame latency for a standard pool table configuration with 16 balls:
-
-| Method | Mean Latency / Frame | Max Theoretical FPS | Relative Speedup | Primary Advantage |
-| :--- | :---: | :---: | :---: | :--- |
-| **Simple (Closed-Form)** | **~39.5 ns** | **~25.3M FPS** | **25.4×** | Minimal latency for low-degree algebra; direct formula. |
-| **DE (Constant / 0-order)** | **~75.2 ns** | **~13.3M FPS** | **13.4×** | Leverages temporal coherence ($\Delta t$); ultra-fast Newton convergence. |
-| **DE (RK4 Integration)** | **~258.4 ns** | **~3.87M FPS** | **3.89×** | High fidelity for curved parameter paths; continuous ODE tracking. |
-| **Homotopy Continuation** | **~1004.4 ns** | **~1.00M FPS** | **1.00× (Baseline)** | Globally robust for high-degree polynomial systems with no closed form. |
-
-![Standard 16-Ball Summary](experiments/results_summary.png)
-
 ---
 
 ### Scaling with Ball Count
 
 As the number of balls on the table increases from 4 to 64, the line-of-sight (LOS) algorithm checks for blocking balls along the cue's ray:
 
-![Ball Count Scaling](experiments/results_ball_scaling.png)
+![Ball Count Scaling](experiments/results_ball_scaling.svg)
 
 - **Simple Solution ($O(N)$)**: Performs scalar quadratic discriminant checks. Highly SIMD-friendly with zero memory allocation, scaling from **15.2 ns** (4 balls) to **62.8 ns** (64 balls).
 - **DE Solution ($O(N)$)**: Tracks the active collision candidate using temporal velocity extrapolation and Newton refinement. Scaling ranges from **37.1 ns** to **182.3 ns** (0-order) and **75.2 ns** to **344.4 ns** (RK4).
@@ -108,7 +95,7 @@ Four specific dynamic scenarios were evaluated:
 3. **Dense Table (32 Balls)**: High-density field with multiple nearby balls.
 4. **Collision Bounce**: Ball velocities reverse abruptly, forcing the Newton displacement tracker to detect discontinuity.
 
-![Operational Scenarios](experiments/results_scenarios.png)
+![Operational Scenarios](experiments/results_scenarios.svg)
 
 ---
 
