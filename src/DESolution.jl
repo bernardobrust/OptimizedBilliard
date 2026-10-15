@@ -322,11 +322,7 @@ end
     elseif PREDICTOR_MODE[] == :euler
         return track_euler(x, p, dp_dt, n, dn_dt, c, dc_dt, rad, dt)
     else
-        p_next = (p[1] + dp_dt[1] * dt, p[2] + dp_dt[2] * dt)
-        n_next = (n[1] + dn_dt[1] * dt, n[2] + dn_dt[2] * dt)
-        c_next = (c[1] + dc_dt[1] * dt, c[2] + dc_dt[2] * dt)
-
-        return track_0th(x, p_next, n_next, c_next, rad)
+        return track_0th(x, p, n, c, rad)
     end
 end
 
