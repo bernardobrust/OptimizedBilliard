@@ -80,6 +80,9 @@ end
     end
 end
 
+# Evaluates the 2-polynomial line-circle system fn(r, p) = (f1, f2):
+#   f1(x, y) = a*(x² + y²) + b*x + c*y + d = 0  (general circle equation)
+#   f2(x, y) = e*x + f*y + g = 0                (general line equation)
 @inline @fastmath function fn_fast(r::Tuple{Float64, Float64}, p::NTuple{7, Float64})
     x, y = r
     a, b, c, d, e, f, g = p
@@ -88,6 +91,7 @@ end
     return (f1, f2)
 end
 
+# Gradient of the circle polynomial f1 with respect to (x, y): (∂f1/∂x, ∂f1/∂y)
 @inline @fastmath function dh1dx_fast(r::Tuple{Float64, Float64}, p::NTuple{7, Float64})
     x, y = r
     a, b, c, d, e, f, g = p
@@ -95,6 +99,7 @@ end
     return (2.0 * a * x + b, 2.0 * a * y + c)
 end
 
+# Gradient of the line polynomial f2 with respect to (x, y): (∂f2/∂x, ∂f2/∂y) = (e, f)
 @inline function dh2dx_fast(p::NTuple{7, Float64})
     return (p[5], p[6])
 end
@@ -119,12 +124,14 @@ end
 end
 
 # Partial derivative of H with respect to continuation parameter t:
-# dH/dt = fn(x, -params_i + params_f)
+# Because H is linear in the parameter vector p(t) = (1 - t)*pi + t*pf,
+# ∂H/∂t = fn(x, pf - pi) (holding x fixed).
 @inline function Ht_fast(x::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     dp = ntuple(i -> pf[i] - pi[i], 7)
     return fn_fast(x, dp)
 end
 
+# Direct Cramer's rule solver for the 2x2 linear system J * dx = b with singularity clamping
 @inline @fastmath function solve_2x2_fast(J::NTuple{4, Float64}, b::Tuple{Float64, Float64})
     j11, j12, j21, j22 = J
     b1, b2 = b
@@ -142,11 +149,13 @@ end
 # 4th-order Runge-Kutta integration step for homotopic path tracking along
 # Davidenko differential equation: dx/dt = - Hx(x, t)^(-1) * Ht(x, t).
 @inline @fastmath function rk4_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}, dt::Float64)
+    # Stage 1: slope k1 at (ic, t)
     J1 = Hx_fast(ic, t, pi, pf)
     Ht1 = Ht_fast(ic, pi, pf)
     sol1 = solve_2x2_fast(J1, Ht1)
     k1 = (-sol1[1], -sol1[2])
 
+    # Stage 2: slope k2 at midpoint t + dt/2 using k1
     dt2 = dt * 0.5
     t2 = t + dt2
     x2 = (ic[1] + k1[1] * dt2, ic[2] + k1[2] * dt2)
@@ -155,12 +164,14 @@ end
     sol2 = solve_2x2_fast(J2, Ht2)
     k2 = (-sol2[1], -sol2[2])
 
+    # Stage 3: slope k3 at midpoint t + dt/2 using k2
     x3 = (ic[1] + k2[1] * dt2, ic[2] + k2[2] * dt2)
     J3 = Hx_fast(x3, t2, pi, pf)
     Ht3 = Ht_fast(x3, pi, pf)
     sol3 = solve_2x2_fast(J3, Ht3)
     k3 = (-sol3[1], -sol3[2])
 
+    # Stage 4: slope k4 at endpoint t + dt using k3
     t4 = t + dt
     x4 = (ic[1] + k3[1] * dt, ic[2] + k3[2] * dt)
     J4 = Hx_fast(x4, t4, pi, pf)
@@ -170,12 +181,13 @@ end
 
     inv6 = 1.0 / 6.0
 
+    # Weighted 4th-order Runge-Kutta combination
     return (ic[1] + (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]) * dt * inv6,
             ic[2] + (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) * dt * inv6)
 end
 
 # Newton-Raphson corrector step for error reduction:
-# x_new = x - Hx(x, t)^(-1) * H(x, t)
+# x_new = x - Hx(x, t)^(-1) * H(x, t) (up to 2 iterations with early exit when ||dx||² < 1e-4)
 @inline function newton_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     x = ic
 
@@ -196,7 +208,7 @@ end
 end
 
 
-# Path tracker on homotopic continuation from initial root ic to target system pf.
+# Adaptive step-size homotopy path tracker from t = 0 (start root `ic` of `pi`) to t = 1 (target `pf`).
 @inline function track_fast(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     thresh_sq = 1.9^2
     t = 0.0
@@ -206,10 +218,13 @@ end
 
     @fastmath while t < 1.0 && itr < 100
         step_dt = min(dt, 1.0 - t)
+        # Predictor: RK4 step along Davidenko ODE
         pred = rk4_step_fast(curr, t, pi, pf, step_dt)
         next_t = t + step_dt
+        # Corrector: Newton projection onto H(x, next_t) = 0
         corr = newton_step_fast(pred, next_t, pi, pf)
 
+        # Additional corrector refinements if prediction-correction discrepancy is large
         diff_pred = abs(corr[1] - pred[1])^2 + abs(corr[2] - pred[2])^2
         sub_it = 0
 
@@ -220,6 +235,7 @@ end
             sub_it += 1
         end
 
+        # Adaptive step-size control: halve dt if step displacement exceeds threshold, else double dt
         diff_curr = abs(corr[1] - curr[1])^2 + abs(corr[2] - curr[2])^2
 
         if diff_curr > thresh_sq
@@ -233,10 +249,12 @@ end
         itr += 1
     end
 
+    # Final polishing Newton step at t = 1.0
     return newton_step_fast(curr, 1.0, pi, pf)
 end
 
 @inline track(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}) = track_fast(ic, pi, pf)
+
 
 # Integration with the system
 @inline @fastmath function aim_cue!(data, sid::Int32)

@@ -1,7 +1,15 @@
 module PlotUtils
 
+# =============================================================================
+# PlotUtils Module
+# Dependency-free native SVG chart generator (line plots and grouped bar charts)
+# for benchmark and numerical accuracy experiments. Automatically exports PNG
+# copies when `rsvg-convert` is available on the system PATH.
+# =============================================================================
+
 using Printf
 
+# Converts a generated SVG file into a 150-DPI PNG image if `rsvg-convert` is installed
 function maybe_convert_png(out_svg::String)
     converter = Sys.which("rsvg-convert")
     if converter === nothing
@@ -13,12 +21,12 @@ function maybe_convert_png(out_svg::String)
     println("Generated: $out_svg and $out_png")
 end
 
-# Color palette for solutions
-const COLOR_SIMPLE   = "#2E7D32" # Dark green
-const COLOR_HOMOTOPY = "#C2185B" # Deep pink/magenta
-const COLOR_DE_0TH   = "#1976D2" # Blue
-const COLOR_DE_EULER = "#00897B" # Teal
-const COLOR_DE_RK4   = "#E65100" # Orange
+# Consistent color palette across all benchmark and trajectory plots
+const COLOR_SIMPLE   = "#2E7D32" # Dark green (Simple analytical baseline)
+const COLOR_HOMOTOPY = "#C2185B" # Deep pink/magenta (Polynomial Homotopy)
+const COLOR_DE_0TH   = "#1976D2" # Blue (DE 0th-order / Constant predictor)
+const COLOR_DE_EULER = "#00897B" # Teal (DE 1st-order Euler predictor)
+const COLOR_DE_RK4   = "#E65100" # Orange (DE 4th-order Runge-Kutta predictor)
 
 """
 Generate an SVG line plot natively in Julia and optionally convert to PNG.
@@ -32,6 +40,7 @@ function plot_line(
     colors::Dict{String, String},
     out_svg::String
 )
+    # Canvas and plot-area layout dimensions in pixels
     w = 800
     h = 520
     pad_left = 90
@@ -42,6 +51,7 @@ function plot_line(
     plot_w = w - pad_left - pad_right
     plot_h = h - pad_top - pad_bottom
 
+    # Compute vertical axis range [0, 1.15 * max_y]
     all_y = Float64[]
     for (k, v) in series
         append!(all_y, v)
@@ -49,12 +59,13 @@ function plot_line(
     min_y = 0.0
     max_y = maximum(all_y) * 1.15
 
-    # Tick calculation
+    # Horizontal axis bounds and linear data-to-pixel coordinate transforms
     min_x = minimum(x_vals)
     max_x = maximum(x_vals)
 
     x_to_px(x) = pad_left + (x - min_x) / (max_x - min_x) * plot_w
     y_to_px(y) = pad_top + plot_h - (y - min_y) / (max_y - min_y) * plot_h
+
 
     io = IOBuffer()
     println(io, """<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" viewBox="0 0 $w $h" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">""")

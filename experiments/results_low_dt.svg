@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <text x="400.0" y="38" text-anchor="middle" font-size="20" font-weight="bold" fill="#212121">Fast-Path Hit Rate vs. Simulation Frequency (1/dt)</text>
+  <line x1="90" y1="450.0" x2="640" y2="450.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="454.0" text-anchor="end" font-size="12" fill="#616161">0</text>
+  <line x1="90" y1="374.0" x2="640" y2="374.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="378.0" text-anchor="end" font-size="12" fill="#616161">23</text>
+  <line x1="90" y1="298.0" x2="640" y2="298.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="302.0" text-anchor="end" font-size="12" fill="#616161">46</text>
+  <line x1="90" y1="222.0" x2="640" y2="222.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="226.0" text-anchor="end" font-size="12" fill="#616161">69</text>
+  <line x1="90" y1="146.0" x2="640" y2="146.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="150.0" text-anchor="end" font-size="12" fill="#616161">92</text>
+  <line x1="90" y1="70.0" x2="640" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="74.0" text-anchor="end" font-size="12" fill="#616161">115</text>
+  <line x1="90.0" y1="70" x2="90.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="90.0" y1="450" x2="90.0" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="90.0" y="474" text-anchor="middle" font-size="13" fill="#424242">120</text>
+  <line x1="95.55555555555556" y1="70" x2="95.55555555555556" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="95.55555555555556" y1="450" x2="95.55555555555556" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="95.55555555555556" y="474" text-anchor="middle" font-size="13" fill="#424242">240</text>
+  <line x1="112.22222222222223" y1="70" x2="112.22222222222223" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="112.22222222222223" y1="450" x2="112.22222222222223" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="112.22222222222223" y="474" text-anchor="middle" font-size="13" fill="#424242">600</text>
+  <line x1="140.0" y1="70" x2="140.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="140.0" y1="450" x2="140.0" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="140.0" y="474" text-anchor="middle" font-size="13" fill="#424242">1200</text>
+  <line x1="195.55555555555554" y1="70" x2="195.55555555555554" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="195.55555555555554" y1="450" x2="195.55555555555554" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="195.55555555555554" y="474" text-anchor="middle" font-size="13" fill="#424242">2400</text>
+  <line x1="362.22222222222223" y1="70" x2="362.22222222222223" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="362.22222222222223" y1="450" x2="362.22222222222223" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="362.22222222222223" y="474" text-anchor="middle" font-size="13" fill="#424242">6000</text>
+  <line x1="640.0" y1="70" x2="640.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="640.0" y1="450" x2="640.0" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="640.0" y="474" text-anchor="middle" font-size="13" fill="#424242">12000</text>
+  <line x1="90" y1="70" x2="90" y2="450" stroke="#424242" stroke-width="1.5"/>
+  <line x1="90" y1="450" x2="640" y2="450" stroke="#424242" stroke-width="1.5"/>
+  <text x="365.0" y="504" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Simulation Frequency 1/dt (Hz)</text>
+  <text transform="rotate(-90)" x="-260.0" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Fast-Path Hit Rate (%)</text>
+  <path d="M 90.0 131.9 L 95.6 124.5 L 112.2 120.5 L 140.0 119.8 L 195.6 119.7 L 362.2 119.6 L 640.0 119.6 " fill="none" stroke="#1976D2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="90.0" cy="131.9" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="95.6" cy="124.5" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="112.2" cy="120.5" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="140.0" cy="119.8" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="195.6" cy="119.7" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="362.2" cy="119.6" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="119.6" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 90.0 126.9 L 95.6 122.0 L 112.2 120.5 L 140.0 119.8 L 195.6 119.7 L 362.2 119.6 L 640.0 119.6 " fill="none" stroke="#00897B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="90.0" cy="126.9" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="95.6" cy="122.0" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="112.2" cy="120.5" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="140.0" cy="119.8" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="195.6" cy="119.7" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="362.2" cy="119.6" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="119.6" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 90.0 122.0 L 95.6 120.8 L 112.2 120.0 L 140.0 119.8 L 195.6 119.7 L 362.2 119.6 L 640.0 119.6 " fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="90.0" cy="122.0" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="95.6" cy="120.8" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="112.2" cy="120.0" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="140.0" cy="119.8" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="195.6" cy="119.7" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="362.2" cy="119.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="119.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <rect x="660" y="80" width="135" height="94" rx="6" fill="#F8F9FA" stroke="#E0E0E0" stroke-width="1"/>
+  <line x1="672" y1="94" x2="692" y2="94" stroke="#1976D2" stroke-width="3"/>
+  <circle cx="682" cy="94" r="4" fill="#1976D2"/>
+  <text x="700" y="98" font-size="12" font-weight="500" fill="#333333">DE (Constant)</text>
+  <line x1="672" y1="120" x2="692" y2="120" stroke="#00897B" stroke-width="3"/>
+  <circle cx="682" cy="120" r="4" fill="#00897B"/>
+  <text x="700" y="124" font-size="12" font-weight="500" fill="#333333">DE (Euler)</text>
+  <line x1="672" y1="146" x2="692" y2="146" stroke="#E65100" stroke-width="3"/>
+  <circle cx="682" cy="146" r="4" fill="#E65100"/>
+  <text x="700" y="150" font-size="12" font-weight="500" fill="#333333">DE (RK4)</text>
+</svg>

@@ -1,29 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
   <rect width="100%" height="100%" fill="#FFFFFF"/>
-  <text x="440.0" y="38" text-anchor="middle" font-size="20" font-weight="bold" fill="#212121">Simulated Update Latency (16-Ball Scene)</text>
+  <text x="440.0" y="38" text-anchor="middle" font-size="20" font-weight="bold" fill="#212121">Simulated Update Latency (16-Ball Scene, 100k Runs)</text>
   <line x1="90" y1="440.0" x2="720" y2="440.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
   <text x="78" y="444.0" text-anchor="end" font-size="12" fill="#616161">0</text>
   <line x1="90" y1="366.0" x2="720" y2="366.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="370.0" text-anchor="end" font-size="12" fill="#616161">129</text>
+  <text x="78" y="370.0" text-anchor="end" font-size="12" fill="#616161">82</text>
   <line x1="90" y1="292.0" x2="720" y2="292.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="296.0" text-anchor="end" font-size="12" fill="#616161">258</text>
+  <text x="78" y="296.0" text-anchor="end" font-size="12" fill="#616161">164</text>
   <line x1="90" y1="218.0" x2="720" y2="218.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="222.0" text-anchor="end" font-size="12" fill="#616161">388</text>
+  <text x="78" y="222.0" text-anchor="end" font-size="12" fill="#616161">246</text>
   <line x1="90" y1="144.0" x2="720" y2="144.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="148.0" text-anchor="end" font-size="12" fill="#616161">517</text>
-  <line x1="90" y1="70.0" x2="720" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="74.0" text-anchor="end" font-size="12" fill="#616161">646</text>
+  <text x="78" y="148.0" text-anchor="end" font-size="12" fill="#616161">328</text>
+  <line x1="90" y1="69.99999999999994" x2="720" y2="69.99999999999994" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="73.99999999999994" text-anchor="end" font-size="12" fill="#616161">410</text>
   <text x="405.0" y="464" text-anchor="middle" font-size="13" font-weight="600" fill="#424242">Standard 16 Balls</text>
-  <rect x="335.0" y="292.5" width="26.0" height="147.5" rx="3" fill="#2E7D32"/>
-  <text x="348.0" y="287.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">258</text>
-  <rect x="363.0" y="289.9" width="26.0" height="150.1" rx="3" fill="#1976D2"/>
-  <text x="376.0" y="284.9" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">262</text>
-  <rect x="391.0" y="306.7" width="26.0" height="133.3" rx="3" fill="#00897B"/>
-  <text x="404.0" y="301.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">233</text>
-  <rect x="419.0" y="293.3" width="26.0" height="146.7" rx="3" fill="#E65100"/>
-  <text x="432.0" y="288.3" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">256</text>
+  <rect x="335.0" y="319.5" width="26.0" height="120.5" rx="3" fill="#2E7D32"/>
+  <text x="348.0" y="314.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">134</text>
+  <rect x="363.0" y="302.2" width="26.0" height="137.8" rx="3" fill="#1976D2"/>
+  <text x="376.0" y="297.2" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">153</text>
+  <rect x="391.0" y="299.2" width="26.0" height="140.8" rx="3" fill="#00897B"/>
+  <text x="404.0" y="294.2" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">156</text>
+  <rect x="419.0" y="291.4" width="26.0" height="148.6" rx="3" fill="#E65100"/>
+  <text x="432.0" y="286.4" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">165</text>
   <rect x="447.0" y="131.7" width="26.0" height="308.3" rx="3" fill="#C2185B"/>
-  <text x="460.0" y="126.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">538</text>
+  <text x="460.0" y="126.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">342</text>
   <line x1="90" y1="70" x2="90" y2="440" stroke="#424242" stroke-width="1.5"/>
   <line x1="90" y1="440" x2="720" y2="440" stroke="#424242" stroke-width="1.5"/>
   <text transform="rotate(-90)" x="-255.0" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Latency (ns / update)</text>

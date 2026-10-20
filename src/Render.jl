@@ -1,12 +1,20 @@
 module Render
 
+# =============================================================================
+# Render Module
+# Handles SDL2 window/renderer creation, TTF font loading, scanline-based
+# filled circle rendering, rotated cue texture rendering, Line-of-Sight (LOS)
+# collision visualization, and the top-right FPS/solver HUD overlay.
+# =============================================================================
+
 using SimpleDirectMediaLayer
 using SimpleDirectMediaLayer.LibSDL2
 
-# Precalculated is not really worth it
+# Precomputed horizontal half-chord widths dx = round(sqrt(R² - dy²)) for scanline circle filling
 const RADIUS = 18
 const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(RADIUS*RADIUS - dy^2))) for dy in -RADIUS:RADIUS]
 
+# Initializes SDL2 video/timer subsystems, SDL_ttf, window, and hardware-accelerated renderer
 @inline function init_display(width::Int32, height::Int32)
     @assert SDL_Init(SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL_GetError()))"
     @assert TTF_Init() == 0 "error initializing TTF: $(unsafe_string(SDL_GetError()))"
@@ -18,6 +26,7 @@ const CIRCLE_OFFSETS = Int32[round(Int32, sqrt(Float32(RADIUS*RADIUS - dy^2))) f
     win, renderer
 end
 
+# Searches bundled and system font paths to load a TrueType font for the HUD
 function load_font(ptsize::Int32 = Int32(16))::Ptr{TTF_Font}
     candidates = String[]
     try
@@ -50,12 +59,14 @@ function load_font(ptsize::Int32 = Int32(16))::Ptr{TTF_Font}
     return Ptr{TTF_Font}(C_NULL)
 end
 
+# Draws a filled disk of radius RADIUS centered at (cx, cy) using horizontal scanlines
 @inline function draw_circle(renderer::Ptr{SDL_Renderer}, cx::Int32, cy::Int32)
     @inbounds @fastmath @simd for dy in Int32(-RADIUS):Int32(RADIUS)
         dx = CIRCLE_OFFSETS[dy+RADIUS+1]
         SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy)
     end
 end
+
 
 @inline function render(data)
     SDL_SetRenderDrawColor(data.renderer, 0, 0, 0, 255)

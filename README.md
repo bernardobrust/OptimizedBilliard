@@ -86,21 +86,25 @@ SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):
 -----------------------------------------------------------------
 | Solution         | Update (ns) | Relative latency |
 |:-----------------|------------:|-----------------:|
-| Simple           |       257.6 |             1.00x |
-| DE (Constant)    |       262.2 |             1.02x |
-| DE (Euler)       |       232.8 |             0.90x |
-| DE (RK4)         |       256.1 |             0.99x |
-| Homotopy         |       538.4 |             2.09x |
+| Simple           |       129.0 |             1.00x |
+| DE (Constant)    |       175.0 |             1.36x |
+| DE (Euler)       |       156.0 |             1.21x |
+| DE (RK4)         |       164.0 |             1.27x |
+| Homotopy         |       340.0 |             2.64x |
 -----------------------------------------------------------------
 ```
 
-These figures vary by machine and runtime; the plots below show the full scaling and scenario measurements.
+These figures vary by machine and runtime (measured over `REPETITIONS = 100,000` simulated updates per configuration); the plots below show the full scaling and scenario measurements.
 
 ![Update latency as the number of balls increases](experiments/results_ball_scaling.svg)
 
 ![Update latency across clear, blocked, dense, and moving-line-of-sight scenes](experiments/results_scenarios.svg)
 
 ![Summary update latency for the 16-ball scene](experiments/results_summary.svg)
+
+![Fast-path hit rate across operational scenarios](experiments/results_fastpath.svg)
+
+![Fast-path hit rate scaling with simulation frequency 1/dt](experiments/results_low_dt.svg)
 
 The methods solve the same geometric first-hit problem, so their tracked paths nearly overlap. In the 600-frame experiment, each DE and Homotopy path differs from the Simple reference by at most about 0.003 pixels. The experiment CSV records the hit type for every frame.
 
@@ -120,50 +124,32 @@ Each plot shows one method against the Simple reference. The x and y coordinates
 
 Simple is expected to do well here: it evaluates inexpensive closed-form line-circle intersections in only two dimensions. Higher-order predictors and continuation methods cannot remove the work of considering the candidate balls, and they add their own numerical work. In higher dimensions, with more complicated geometric constraints, or with polynomial systems that lack a cheap direct solution, methods such as predictor-corrector continuation or Homotopy can become more useful and may outperform a direct approach. That depends on the problem and should be measured rather than assumed.
 
-### In-Game Performance vs. Benchmark Discrepancy (Why RK4 is ~600 FPS Faster In-Game)
+### Detailed Experimental Investigations (100,000 Runs)
 
-When running the interactive game, switching to `DE (RK4)` often yields an immediate boost of **~600 FPS** over `DE (Constant)`, even though the offline benchmark shows Constant and RK4 having nearly identical simulated latency (with Constant appearing slightly faster).
+#### 1. Central Loop Fast-Path Frequency (`tracked_fast`)
+In `DESolution.aim_cue!`, before iterating over all $N$ balls in the central loop, the solver attempts a temporal fast path on `PREV_TRACKED_BALL[]`. When `newton_move_sq < 0.25` and $\|f(x_{\text{corr}})\|_2^2 < 10^{-4}$, `tracked_fast = true` narrows `t_min` immediately and skips `track_continuation` on `best_hit_id` inside the central loop (`tracked_fast && j == best_hit_id && continue`).
 
-This discrepancy stems from three interrelated mechanics: **temporal fast paths**, **numerical zeros in the Davidenko vector field**, and **benchmark dilution**.
+Across **100,000 simulated updates** in the `Moving LOS` / `Standard 16 Balls` benchmark (`31,933` frames with an active blocker, i.e., `31.9%` of all frames):
+- **`DE (Constant)`**: takes the fast path on **28,741 / 31,933** blocked frames (**90.00%** of eligible frames, **28.74%** of all frames), calling `track_continuation` `5,021` times in the central loop.
+- **`DE (Euler)`**: takes the fast path on **30,006 / 31,933** blocked frames (**93.97%** of eligible frames, **30.01%** of all frames), calling `track_continuation` `3,797` times.
+- **`DE (RK4)`**: takes the fast path on **31,499 / 31,933** blocked frames (**98.64%** of eligible frames, **31.50%** of all frames), calling `track_continuation` only `2,171` times (with an `86.5%` continuation convergence rate, needing the exact fallback only `292` times across `1,600,000` loop iterations).
 
-#### 1. The Fast-Path Shortcut
-In `DESolution.aim_cue!`, both methods attempt a temporal fast path before iterating over all $N$ balls. If the previously tracked blocker ball can be updated with high confidence, the solver accepts the result and **bypasses the remaining candidate ball loops entirely**:
-```julia
-# Newton corrector step
-x_corr = newton_step(x_pred, p, n, c_now, rad)
-newton_move_sq = (x_corr[1] - x_pred[1])^2 + (x_corr[2] - x_pred[2])^2
-err = f_error(x_corr, p, n, c_now, rad)
+#### 2. Experiments with Very Small Timesteps ($\Delta t \to 0$)
+Decreasing $\Delta t$ from $1/120\text{ s}$ ($8.33 \times 10^{-3}\text{ s}$) down to $1/12000\text{ s}$ ($8.33 \times 10^{-5}\text{ s}$) reduces per-step ball displacement $\|v \Delta t\|$ and chord curvature error $O(\Delta t^2)$:
+- **Fast-Path Convergence**: As $\Delta t$ shrinks from $1/120\text{ s}$ to $1/12000\text{ s}$, the fast-path hit rate of `DE (Constant)` rises from **96.27%** to **99.99%**, matching `DE (Euler)` (**97.76% → 99.99%**) and `DE (RK4)` (**99.25% → 99.99%**).
+- **Accuracy Scaling**: Against the exact `Float64` reference (quantized to `Float32` output), `DE (RK4)` maintains a flat floor of $\text{RMSE} \approx 1.0 \times 10^{-5}\text{ px}$ across all $\Delta t$, while `DE (Constant)` and `DE (Euler)` improve from $\text{RMSE} \approx 2.0 \times 10^{-4}\text{ px}$ at $120\text{ Hz}$ down to $3.9 \times 10^{-5}\text{ px}$ and $2.1 \times 10^{-5}\text{ px}$ at $6000\text{ Hz}$.
 
-if newton_move_sq < 0.25 && (err[1]*err[1] + err[2]*err[2]) < 1e-4 ...
-    tracked_fast = true
-end
-```
-When `tracked_fast` succeeds, no continuation paths are tracked, no linear systems are solved for other balls, and the raycast completes in virtually $0\text{ ns}$.
+#### 3. Constant Predictor Newton Iteration Ablation (2 vs. 1 vs. 0 Iterations)
+We validated the impact of reducing the number of Newton-Raphson corrector iterations in `DE (Constant)` (`set_constant_newton_iters!`) as well as eliminating the redundant second `track_continuation` call on `r_exit`:
+- **2 → 1 Newton Iteration**: At $\Delta t = 1/120\text{ s}$, reducing from `2` Newton iterations to `1` preserves identical maximum error vs. `Simple` (`0.002458 px`) and virtually identical RMSE (`0.000284 px` vs. `0.000270 px`, or `0.000127 px` vs. `0.000110 px` against exact `Float64`), while maintaining a **96.27%** fast-path hit rate and reducing update latency (`~155 ns` vs. `~174 ns`).
+- **1 → 0 Newton Iterations (Predictor-Only)**: Removing the remaining Newton corrector step from the fast path (`0` iterations, pure linear extrapolation `x_corr = prev_sol + PREV_DELTA`) causes $\|f(x_{\text{corr}})\|_2^2 \ge 10^{-4}$ on every frame at $\Delta t = 1/120\text{ s}$ (**0.00%** fast-path hit rate, forcing 100% fallback to the central loop; if the residual check is also disabled, the uncorrected tangent extrapolation diverges to `374.0 px` error). At very small timesteps ($\Delta t = 1.67 \times 10^{-4}\text{ s}$), even `0` Newton iterations in the fast path achieves a **57.08%** fast-path hit rate with `RMSE = 0.000319 px`.
 
-#### 2. Exact Numerical Zeros and RK4's High-Order Accuracy
-RK4 integrates the Davidenko differential equation along the physical trajectory of the moving ball:
-$$\frac{dx}{dt} = - J(x)^{-1} \frac{\partial f}{\partial t}$$
-- **Ray Derivatives and Line-of-Sight Kinematics**:
-  - When the aiming direction is fixed ($sid == 0$ or stationary cue), $dp/dt = (0, 0)$ and $dn/dt = (0, 0)$. In the partial derivative vector $\partial f / \partial t$, the line constraint error derivative is an exact numerical zero:
-    $$\frac{\partial f_1}{\partial t} = \left(\frac{dn}{dt}\right)^T (x - p) - n^T \frac{dp}{dt} \equiv 0.0$$
-    Because this component is identically zero, solving $J \frac{dx}{dt} = -\frac{\partial f}{\partial t}$ mathematically guarantees that $n^T \frac{dx}{dt} = 0$. The predicted velocity $dx/dt$ is **strictly collinear with the line-of-sight unit vector $u$**, reducing along the ray to:
-    $$\frac{dx}{dt} = \left( \frac{(x - c)^T \dot{c}}{(x - c)^T u} \right) u$$
-  - When dynamically aiming at a moving target ball ($sid \ne 0$), the line of sight rotates with angular velocity $\dot{n} = (\dot{u}_y, -\dot{u}_x)$, where $\dot{u} = \frac{v_{\text{target}} - (v_{\text{target}} \cdot u)u}{\|V\|}$, which the Davidenko vector field accounts for in $\partial f_1 / \partial t$.
-- **$O(\Delta t^5)$ Local Precision**: Because the ball moves with constant velocity between bounces, RK4 tracks the constraint with fourth-order Runge-Kutta accuracy (local truncation error $O(\Delta t^5) \approx 10^{-11}$ at $\Delta t = 1/120\text{ s}$). The predicted point $x_{pred}$ lands so close to the true perimeter that the subsequent Newton correction displacement is practically negligible.
-- As a result, `newton_move_sq < 0.25` and `err_sq < 1e-4` pass effortlessly on every frame, achieving nearly a **100% fast-path hit rate** in active gameplay.
-
-#### 3. Why Constant (0-th Order) Frequently Drops Out of the Fast Path
-Constant uses 0th-order position holding / linear finite-difference extrapolation from the previous frame (`x_pred = prev_sol + PREV_DELTA`). It bypasses Davidenko differential equations entirely. In real gameplay, it frequently fails the strict $0.25\text{ px}^2$ ($0.5\text{ px}$) fast-path threshold:
-- **Zero-Order Step Lag on Blocker Appearance**: On the first frame a blocker appears, previous delta is uninitialized (`PREV_DELTA == 0.0`), predicting zero displacement (`x_pred = prev_sol`). At $140\text{ px/s}$, the ball moves $\sim 1.17\text{ px}$ in one frame, requiring a Newton shift of $1.17\text{ px}$ (`newton_move_sq` $\approx 1.37 > 0.25$), instantly failing the fast path.
-- **Nonlinear Chord Acceleration**: As a circle moves across a ray, the intersection distance $t(t) = t_{proj}(t) - \sqrt{R^2 - d_\perp(t)^2}$ accelerates nonlinearly ($\ddot{t} \ne 0$). Constant linear extrapolation ignores this curvature ($\frac{1}{2}\ddot{x}\Delta t^2$), frequently exceeding the $0.25$ movement or $10^{-4}$ residual limit near entry and graze angles.
-- **Fixed-Rate Accumulator Repeats**: In `Update.update_aim_at_fixed_rate!`, when frame drops cause multiple aim iterations per frame, physics does not advance between sub-steps. Constant blindly applies `PREV_DELTA` to stationary balls, requiring Newton to undo the offset, blowing up `newton_move_sq` and dropping out of the fast path.
-- Whenever Constant misses the fast path, it falls back to the full $O(N)$ candidate loop and evaluates `track_continuation` on candidate roots.
-
-#### 4. Why the Benchmark Hides This
-1. **Physics Overhead Masks Solvers**: The benchmark measures `step!() = (advance_game_physics!(data); f!(data, sid))`. The $O(N^2)$ pairwise collision physics takes $\sim 180\text{ ns}$ out of the total $\sim 230\text{--}340\text{ ns}$, compressing the visible solver latency gap.
-2. **Clear Line-of-Sight Dilution**: In the benchmark's 15,000 randomized frames, **78.4% of frames have unobstructed lines of sight**. When no blocker exists, `best_hit_id == 0` and neither solver takes the fast path; both perform identical quick bounding rejections.
-3. **Continuation Asymmetry on Failure**: When the fast path *is* bypassed, Constant's `track_continuation` only performs a single Newton step, whereas RK4 performs 4 Runge-Kutta stages plus Newton correction. In synthetic tests without continuous tracking, Constant appears cheaper.
-4. **Nonlinear FPS Scaling**: Frame rate scales inversely with time ($FPS = 1 / T_{frame}$). At ultra-high frame rates ($1500\text{--}2500\text{ FPS}$), a frame time delta of only $\sim 150\ \mu\text{s}$ produces a massive **~600 FPS gap** on the in-game display.
+#### 4. Mathematical & Numerical Validation of `track_continuation`
+Validating `DESolution.track_continuation` uncovered and resolved three critical issues:
+1. **Zero-Slope Degeneracy at $s = 0$ ($\partial f_2 / \partial s|_{s=0} \equiv 0$)**: Because `c_start = p + t_proj * u` is the orthogonal projection of `c_target` onto the ray, the center shift $\Delta c = c_{\text{target}} - c_{\text{start}}$ is strictly orthogonal to $u$, while the initial root offset $\text{ic} - c_{\text{start}} = \mp R u$ is strictly parallel to $u$. Consequently, $(\text{ic} - c_{\text{start}}) \cdot \Delta c \equiv 0$, which previously caused the naive derivative $\partial f_2 / \partial s = -2(x - c_{\text{start}}) \cdot \Delta c$ at $s = 0$ to evaluate to **exact zero** (`(0.0, 0.0)`), making `:euler` predict zero displacement (`x_pred == ic`, identical to `:zero_order`) and zeroing stage `k1` of `:rk4`. Using the convex-linear-homotopy / midpoint derivative $\partial H_2 / \partial s = -2(x - c_{\text{mid}}) \cdot \Delta c$ eliminates this degeneracy, improving `:euler` continuation accuracy by up to $10^6\times$ (convergence rate across $d_\perp \in [0, R)$ rising from **10.6% → 45.0%** for 1 step and **62.2%** for 4 steps) and `:rk4` residual at $d_\perp = 10\text{ px}$ by $17,000\times$ ($6.02 \times 10^{-5} \to 3.56 \times 10^{-9}$, with single-step convergence rising from **80.0% → 97.8%** of the ball radius).
+2. **Multi-Step Loop Restoration (`steps > 1`)**: Restored the `for _ in 1:steps` continuation loop across `:zero_order`, `:euler`, and `:rk4` so multi-step homotopy continuation properly integrates from $s = 0$ to $s = 1$.
+3. **Single-Root `r_entry` Tracking**: Removed the redundant `track_continuation(r_exit, ...)` call in `aim_cue!`, halving continuation work per candidate ball in the central loop without affecting accuracy.
 
 The benchmark renders SVG directly. If `rsvg-convert` is installed, it also creates PNG copies.
+
 

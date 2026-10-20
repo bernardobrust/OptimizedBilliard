@@ -1,4 +1,11 @@
-# Deterministic game-sized time series for the DE predictors and Homotopy.
+# =============================================================================
+# Tracked First-Hit Point Trajectory Experiment
+# Simulates a deterministic 16-ball scene over 600 frames (5.0 seconds at 120 Hz)
+# where a moving blocker ball (Ball 2) initially obstructs the cue's Line of
+# Sight (LOS) to the moving target ball (Ball 1) and leaves the ray around t ≈ 1.12s.
+# Exports frame-by-frame coordinates and hit kinds to CSV and renders per-method
+# comparison SVGs against the analytical Simple reference.
+# =============================================================================
 include("../src/Data.jl")
 include("../src/SimpleSolution.jl")
 include("../src/HomotopySolution.jl")
@@ -10,10 +17,16 @@ using .Data, .SimpleSolution, .DESolution, .HomotopySolution
 using .DEConstantSolution, .DEEulerSolution, .DERK4Solution
 using Printf
 
+# Fixed timestep (120 Hz) and total number of simulated frames (5.0 seconds)
 const STEP = 1.0 / 120.0
 const FRAMES = 600
 const HIT_KIND = Dict{String,Vector{String}}()
 
+# Constructs a deterministic 16-ball scene with:
+# - Ball 1: target ball moving diagonally
+# - Ball 2: blocker ball crossing the cue-to-target line of sight during frames 1..134
+# - Ball 3: secondary moving ball away from the ray
+# - Balls 4..16: stationary background balls placed along the bottom of the table
 function make_scene()
     n = Int32(16)
     ball_x = zeros(Float32, n)
@@ -38,6 +51,7 @@ function make_scene()
         Ptr{Data.TTF_Font}(C_NULL), 0.0, 0.0, zeros(100), 1, 1, 100)
 end
 
+# Advances ball positions by one fixed timestep `STEP` with specular wall reflections
 function advance!(d)
     dt = Float32(STEP)
     for i in 1:d.num_balls
@@ -64,8 +78,12 @@ function advance!(d)
     end
 end
 
+# Runs a single aiming method across all `FRAMES` steps, recording (collision_x, collision_y)
+# and classifying each frame as hitting the "blocker" or the "target" ball.
 function run_series(name, aim!, mode=nothing)
     d = make_scene()
+    DESolution.set_algorithmic_dt!(STEP)
+    DESolution.set_constant_newton_iters!(1)
     mode === nothing || DESolution.set_predictor_mode!(mode)
     DESolution.PREV_TRACKED_BALL[] = 0
     DESolution.PREV_DELTA_X[] = 0.0
@@ -85,6 +103,7 @@ function run_series(name, aim!, mode=nothing)
     return name => points
 end
 
+# Execute all 4 continuation solvers and the analytical Simple reference
 series = [
     run_series("DE 0th", DEConstantSolution.aim_cue!),
     run_series("DE Euler", DEEulerSolution.aim_cue!),
@@ -93,6 +112,7 @@ series = [
 ]
 reference = run_series("Simple reference", SimpleSolution.aim_cue!)
 
+# Export complete trajectory dataset to CSV
 csv_path = joinpath(@__DIR__, "tracked_point_trajectories.csv")
 open(csv_path, "w") do io
     println(io, "frame,time_s,solution,hit_kind,x,y")
@@ -101,6 +121,7 @@ open(csv_path, "w") do io
     end
 end
 
+# Render 2-panel SVG trajectory comparison plots (x(t) and y(t)) with path breaks at blocker-to-target switches
 colors = Dict("DE 0th" => "#1976D2", "DE Euler" => "#00897B", "DE RK4" => "#E65100", "Homotopy" => "#C2185B")
 const WIDTH, HEIGHT, LEFT, TOP, PLOT_W, PLOT_H = 1000, 700, 85, 55, 850, 255
 for (name, points) in series
@@ -146,3 +167,4 @@ for (name, points) in series
     println("Wrote $svg_path")
 end
 println("Wrote $csv_path")
+

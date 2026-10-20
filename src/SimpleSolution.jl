@@ -58,18 +58,20 @@ export aim_cue!
 # =============================================================================
 
 @inline function aim_cue!(data, sid::Int32)
+    # Cue pivot / ray origin Q = (qx, qy)
     qx = data.cue_x
     qy = data.cue_y
 
-    # Aiming at arbitrary direction
+    # Case 1: Aiming at an arbitrary fixed direction in empty space (no target ball selected)
     if sid == 0
         !data.has_aim && return
         ux = data.aim_dir_x
         uy = data.aim_dir_y
 
+        # Align cue sprite orientation with ray direction (sprite points along +Y at 0°)
         data.cue_angle = rad2deg(atan(uy, ux)) - 90.0f0
 
-        # When aiming fixed in a direction, the ray extends to the table boundary
+        # Compute ray distance to the nearest table wall boundary [0, bound_x] x [0, bound_y]
         t_bound = Float32(1e6)
         if ux > 1.0f-6
             t_bound = min(t_bound, (data.bound_x - qx) / ux)
@@ -85,18 +87,20 @@ export aim_cue!
         t_min = t_bound
         hit_x = qx + t_bound * ux
         hit_y = qy + t_bound * uy
-    # Aiming at ball
+    # Case 2: Aiming dynamically at a tracked contact point on ball `sid`
     else
+        # World coordinates of the tracked point P_track(t) = C_sid(t) + r_offset
         tx = data.ball_x[sid] + data.track_offset_x
         ty = data.ball_y[sid] + data.track_offset_y
 
+        # Sightline vector V = P_track(t) - Q
         dx = tx - qx
         dy = ty - qy
 
         # V = P_track(t) - Q, θ = atan2(V_y, V_x), cue_angle = θ - 90°
         data.cue_angle = rad2deg(atan(dy, dx)) - 90.0f0
 
-        # Line-circle intersection for LOS
+        # Guard against degenerate zero-length ray when cue pivot coincides with target point
         dist_sq = dx * dx + dy * dy
         if dist_sq <= 1.0f-6
             data.collision_x = tx
@@ -104,11 +108,13 @@ export aim_cue!
             return
         end
 
+        # Normalize sightline vector: u = V / ||V||₂
         dist = sqrt(dist_sq)
         inv_dist = 1.0f0 / dist
         ux = dx * inv_dist
         uy = dy * inv_dist
 
+        # Default unobstructed hit is the tracked point itself at distance `dist`
         t_min = dist
         hit_x = tx
         hit_y = ty
@@ -117,22 +123,26 @@ export aim_cue!
     rad = data.ball_radius
     rad_sq = rad * rad
 
-    # Raycasting hit
+    # Analytical raycasting loop over all candidate blocker balls j ≠ sid
     @inbounds @fastmath for j in 1:data.num_balls
         j == sid && continue
 
+        # Vector Wⱼ = Cⱼ - Q from ray origin to candidate ball center
         vx = data.ball_x[j] - qx
         vy = data.ball_y[j] - qy
 
+        # Axial projection of ball center onto the unit ray direction: t_proj = Wⱼ ⋅ u
         t_proj = vx * ux + vy * uy
 
-        # Early rejection: ball is behind cue origin or past current closest collision
+        # Early bounding rejection: ball is behind cue origin or beyond current closest hit `t_min`
         if t_proj <= -rad || t_proj >= t_min + rad
             continue
         end
 
+        # Squared perpendicular distance from ball center to ray: d_perp² = ||Wⱼ||² - t_proj²
         d_perp_sq = (vx * vx + vy * vy) - t_proj * t_proj
         if d_perp_sq < rad_sq
+            # Half-chord length h = sqrt(R² - d_perp²) and closest intersection parameter t_entry
             h = sqrt(rad_sq - d_perp_sq)
             t_entry = t_proj - h
             if t_entry > 0.0f0 && t_entry < t_min
@@ -143,8 +153,10 @@ export aim_cue!
         end
     end
 
+    # Export closest first-hit coordinates for rendering and trajectory analysis
     data.collision_x = hit_x
     data.collision_y = hit_y
 end
 
 end # module SimpleSolution
+
