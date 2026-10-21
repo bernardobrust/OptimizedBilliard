@@ -3,11 +3,11 @@
 # Measures simulated updates using the game's ball integration, wall reflection,
 # pair collisions, and aim solver (rendering and event handling excluded), and
 # runs numerical experiments on:
-#   1. Ball count scaling (N = 4, 8, 16, 32, 64) over 100,000 steps
-#   2. Operational scenarios (Clear, Blocked, Dense, Moving LOS) over 100,000 steps
-#   3. Standard 16-ball latency summary over 100,000 steps
+#   1. Ball count scaling (N = 4, 8, 16, 32, 64) over 1,000,000 steps
+#   2. Operational scenarios (Clear, Blocked, Dense, Moving LOS) over 1,000,000 steps
+#   3. Standard 16-ball latency summary over 1,000,000 steps
 #   4. Central loop fast-path hit rate & branch breakdown
-#   5. Very small timestep (low `dt`) accuracy, fast-path, and latency scaling
+#   5. Timestep (`dt`) accuracy, fast-path, and latency scaling
 #   6. Constant predictor Newton iteration ablation (2 vs 1 vs 0 iterations)
 #      and `track_continuation` mathematical/numerical validation
 # =============================================================================
@@ -30,8 +30,8 @@ using .PlotUtils
 using Printf
 using Random
 
-# Number of simulated physics + aiming updates per benchmark run (increased from 15,000 to 100,000)
-const REPETITIONS = 100_000
+# Number of simulated physics + aiming updates per benchmark run (1,000,000 runs)
+const REPETITIONS = 1_000_000
 
 # Creates a deterministic `DataPlex` scene with `num_balls` balls for reproducible benchmarking
 function create_data(num_balls::Int32; blocked::Bool=true, dt_target::Float64=1.0/120.0)
@@ -585,7 +585,7 @@ end
 
 function run_all_benchmarks()
     println("=================================================================")
-    println("     OPTIMIZED BILLIARD - BENCHMARK SUITE (100,000 RUNS)         ")
+    println("    OPTIMIZED BILLIARD - BENCHMARK SUITE (1,000,000 RUNS)        ")
     println("=================================================================")
 
     colors = Dict(
@@ -636,7 +636,7 @@ function run_all_benchmarks()
 
     out_scaling = joinpath(dir, "results_ball_scaling.svg")
     PlotUtils.plot_line(
-        "Execution Time vs. Number of Balls (100k Runs)",
+        "Execution Time vs. Number of Balls (1M Runs)",
         "Number of Balls on Table",
         "Latency (ns / simulated update)",
         ball_counts,
@@ -699,7 +699,7 @@ function run_all_benchmarks()
 
     out_scenarios = joinpath(dir, "results_scenarios.svg")
     PlotUtils.plot_grouped_bar(
-        "Latency Across Operational Scenarios (100k Runs)",
+        "Latency Across Operational Scenarios (1M Runs)",
         "Latency (ns / simulated update)",
         categories,
         series_names,
@@ -730,7 +730,7 @@ function run_all_benchmarks()
 
     out_summary = joinpath(dir, "results_summary.svg")
     PlotUtils.plot_grouped_bar(
-        "Simulated Update Latency (16-Ball Scene, 100k Runs)",
+        "Simulated Update Latency (16-Ball Scene, 1M Runs)",
         "Latency (ns / update)",
         summary_cats,
         series_names,
@@ -754,7 +754,7 @@ function run_all_benchmarks()
     # -------------------------------------------------------------------------
     # Experiment 4: Central Loop Fast-Path Frequency & Branch Breakdown
     # -------------------------------------------------------------------------
-    println("\n[4/6] Analyzing central loop fast-path hit rates across 100,000 updates...")
+    println("\n[4/6] Analyzing central loop fast-path hit rates across 1,000,000 updates...")
     fp_series = ["DE (Constant)", "DE (Euler)", "DE (RK4)"]
     fp_plot_data = Dict{String, Vector{Float64}}(
         "DE (Constant)" => zeros(Float64, length(categories)),
@@ -764,11 +764,11 @@ function run_all_benchmarks()
     scenario_objs = [d_clear, d_blocked, d_dense, d_moving]
 
     for (s_idx, (cat, d_scen)) in enumerate(zip(categories, scenario_objs))
-        println("  --- Scenario: $cat (100,000 frames) ---")
+        println("  --- Scenario: $cat (1,000,000 frames) ---")
         for (m_name, m_sym) in (("DE (Constant)", :zero_order), ("DE (Euler)", :euler), ("DE (RK4)", :rk4))
             st = analyze_fastpath_and_loop(d_scen, Int32(1), m_sym; reps=REPETITIONS)
             fp_plot_data[m_name][s_idx] = st.fast_hit_rate_eligible
-            @printf("    %-14s | Eligible: %6d (%5.1f%%) | Fast-Path Taken: %6d (%6.2f%% of eligible, %5.2f%% total) | Loop Cont: %5d (Conv: %5d, Fallback: %4d)\n",
+            @printf("    %-14s | Eligible: %7d (%5.1f%%) | Fast-Path Taken: %7d (%6.2f%% of eligible, %5.2f%% total) | Loop Cont: %6d (Conv: %6d, Fallback: %5d)\n",
                     m_name, st.fast_eligible, 100.0 * st.fast_eligible / st.reps,
                     st.fast_taken, st.fast_hit_rate_eligible, st.fast_hit_rate_all,
                     st.loop_cont_calls, st.loop_cont_conv, st.loop_fallback)
@@ -777,7 +777,7 @@ function run_all_benchmarks()
 
     out_fastpath = joinpath(dir, "results_fastpath.svg")
     PlotUtils.plot_grouped_bar(
-        "Fast-Path Hit Rate (% of Blocked Frames, 100k Runs)",
+        "Fast-Path Hit Rate (% of Blocked Frames, 1M Runs)",
         "Fast-Path Hit Rate (%)",
         categories,
         fp_series,
