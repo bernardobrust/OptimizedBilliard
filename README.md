@@ -126,6 +126,47 @@ Each plot shows one method against the Simple reference. The x and y coordinates
 
 Simple is expected to do well here: it evaluates inexpensive closed-form line-circle intersections in only two dimensions. Higher-order predictors and continuation methods cannot remove the work of considering the candidate balls, and they add their own numerical work. In higher dimensions, with more complicated geometric constraints, or with polynomial systems that lack a cheap direct solution, methods such as predictor-corrector continuation or Homotopy can become more useful and may outperform a direct approach. That depends on the problem and should be measured rather than assumed.
 
+### Why Each Method Is Faster or Slower: Algorithmic & Hardware Breakdown
+
+The observed latency ranking—**`Simple` (`~130 ns`) < `DE (Constant)` (`~142 ns`) < `DE (Euler)` (`~146 ns`) < `DE (RK4)` (`~161 ns`) $\ll$ `Homotopy` (`~339 ns`)**—is a direct consequence of the trade-off between **per-step arithmetic cost** (Jacobian linear solves vs. hardware `sqrt`) and **fast-path / continuation convergence rates**:
+
+| Method | Fast-Path Predictor Cost | Fast-Path Corrector Cost | $2\times 2$ Linear Solves / Fast-Path | Fast-Path Hit Rate (`Moving LOS`) | Central Loop Continuation Calls | Why It Ranks Here |
+| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
+| **`Simple`** | None (stateless) | Exact `sqrt(R² - d_⊥²)` | **0** | N/A | 0 (direct `sqrt`) | 1 hardware `sqrt` (~3–4 CPU cycles) in `Float32` is cheaper than any $2\times 2$ Jacobian solve |
+| **`DE (Constant)`** | 2 additions (`x + Δx`) | 1× `newton_step` | **1** | 89.94% | 5,196 | Zero-cost predictor + single Newton step; fastest DE variant, but lowest continuation convergence |
+| **`DE (Euler)`** | 1× `euler_step` (`dx_dt`) | 1× `newton_step` | **2** | 93.97% | 3,797 | 1 extra `solve_2x2` in predictor is nearly offset by 27% fewer central-loop continuation calls |
+| **`DE (RK4)`** | 4-stage `rk4_step` | 1× `newton_step` | **5** | 98.64% | 2,171 | 5× the linear solves of `Constant`, partially amortized by 98.6% fast-path & 97.8% loop convergence |
+| **`Homotopy`** | None (stateless) | 5-step Euler+Newton on 2 roots | **~32 / ball** | 0% (no fast path) | Every candidate ball | Tracks both roots (`r_entry`, `r_exit`) over 5 homotopy steps from scratch on every frame |
+
+#### 1. Why `Simple` (`1.00x`, ~130 ns) Is the Fastest Baseline in 2D
+- **Minimal instruction count per candidate ball**: Once a ball passes the cheap axial (`t_proj <= 0 || t_proj >= t_min`) and perpendicular (`d_perp_sq >= R²`) dot-product filters, computing the exact entry intersection requires only **one hardware `sqrt`** (`h = sqrt(R² - d_perp_sq)`) and two fused multiply-adds (`hit = p + (t_proj - h) * u`) in `Float32`.
+- **Zero state or matrix overhead**: It performs no `Float32 → Float64` conversions, evaluates no nonlinear residual vectors (`f_error`), constructs no Jacobian matrices, and executes zero floating-point divisions inside the candidate loop. On modern x86_64 CPUs, a scalar `sqrtss` instruction has a latency of ~3–4 cycles—less than a single $2\times 2$ Cramer's rule division (`1.0 / detJ`) in `solve_2x2`.
+
+#### 2. Why `DE (Constant)` (`1.09x`, ~142 ns) Is the Fastest DE Method—Wait, Why Doesn't the Fast Path Beat `Simple`?
+- **Why it beats `Euler` and `RK4`**: Its temporal predictor (`x_pred = prev_sol + PREV_DELTA`) uses only **2 floating-point additions** (extrapolating the previous frame's displacement without evaluating the Davidenko ODE or velocity derivatives), followed by **strictly one Newton-Raphson iteration** (`newton_step`). This requires only **1 linear solve (`solve_2x2`)** per fast-path frame.
+- **Why it is still ~9% slower than `Simple` on average**:
+  1. **The $O(N)$ broad-phase loop cannot be skipped**: Even when `tracked_fast == true` succeeds on `prev_ball_id` (which happens on **89.9%–96.3%** of blocked frames), the solver **must still iterate over all other $N - 2$ balls** in the central loop to verify that no other ball has moved closer than `t_min`. Thus, the fast path narrows `t_min` early and skips `prev_ball_id`, but still pays the loop traversal cost.
+  2. **Fast-path overhead vs. `sqrt`**: Computing `x_pred`, running 1 `Float64` `newton_step`, and re-evaluating `f_error(x_corr)` + `newton_move_sq` to validate convergence takes ~18 FLOPs and 1 division—slightly more work than `Simple` does to solve the intersection analytically with a single `sqrt`.
+  3. **Low spatial continuation convergence in the central loop**: When the fast path misses (e.g., on the first frame a new blocker enters the ray) and `track_continuation` is called in `:zero_order` mode, starting from `r_entry` at $s = 0$ with a single constant-predictor Newton step only converges within $\|f(x)\|^2 < 10^{-4}$ for small perpendicular offsets ($d_\perp < 1.9\text{ px}$, or **10.6%** of $[0, R)$). On the remaining **89.4%** of central-loop continuation calls (`4,952 / 5,196` in `Moving LOS`), it fails the residual check and falls back to the exact `sqrt`, paying for *both* the Newton step and the exact fallback.
+
+#### 3. Why `DE (Euler)` (`1.12x`, ~146 ns) Almost Ties `DE (Constant)`
+- **Higher per-frame predictor cost**: In the fast path, `DE (Euler)` computes the analytical velocity of the sightline normal (`dn_dt`) and blocker center (`dc_dt`), evaluates `euler_step` (1 `solve_2x2` call), and then applies `newton_step` (a 2nd `solve_2x2` call)—**twice the linear-algebra work** of `DE (Constant)`.
+- **Amortization via higher accuracy**: Because first-order tangent integration along the Davidenko ODE (`dx/dt = -J⁻¹ ∂f/∂t`) predicts the intersection movement along the circle much more accurately than constant displacement extrapolation:
+  - Its fast-path hit rate in `Moving LOS` jumps from **89.94% → 93.97%**, reducing central-loop `track_continuation` calls by **27%** (`5,196 → 3,797`).
+  - Inside `track_continuation`, using the midpoint secant derivative $\partial H_2/\partial s = -2(x - c_{\text{mid}})\cdot \Delta c$ raises single-step spatial convergence from **10.6% → 45.0%**, cutting exact fallbacks by **40%** (`4,952 → 2,989`).
+  - As a result, the time saved by avoiding failed predictions almost completely pays for the extra `solve_2x2` in `euler_step` (and in dense 32–64 ball scenes, `DE (Euler)` even matches or edges out `DE (Constant)`).
+
+#### 4. Why `DE (RK4)` (`1.23x`, ~161 ns) Is Slower Than `Constant` and `Euler`, Yet Still Competitive
+- **5× linear solves per step**: Every `rk4_step` in the fast path (and every `:rk4` call in `track_continuation`) evaluates **4 Runge-Kutta stages (`k1, k2, k3, k4`) + 1 `newton_step` = 5 `solve_2x2` inversions** (5 divisions and ~80 FLOPs).
+- **Why it is only ~13% slower than `DE (Constant)` (instead of 5× slower)**:
+  1. **Fast-path amortization**: In `Moving LOS` (`16` balls), ~68% of frames have an unobstructed sightline where no fast-path or continuation is triggered at all, and on the 31.9% of blocked frames, `RK4` achieves a **98.64%** fast-path hit rate—meaning `track_continuation` is only invoked `2,171` times across `100,000` frames (`0.02` calls per frame).
+  2. **Near-100% single-step continuation convergence**: When `track_continuation` *is* called, 4th-order integration tracks the circular arc across $s \in [0, 1]$ with **97.8%** single-step convergence across $[0, R)$, requiring the exact fallback only `292` times in `100,000` frames (17× fewer fallbacks than `Constant`).
+
+#### 5. Why `Homotopy` (`2.60x`, ~339 ns) Is Always the Slowest Method
+- **Stateless across frames (0% fast path)**: Unlike `DESolution`, `HomotopySolution` does not track `PREV_TRACKED_BALL[]` between frames. Every single frame, it treats the scene as a brand-new polynomial system.
+- **Multi-step integration of *both* roots per candidate ball**: For every ball whose bounding circle intersects the ray (`d_perp_sq < R²`), `HomotopySolution` initializes a start system centered on the ray (`r_entry` and `r_exit`) and integrates **both roots** across `N_HOMOTOPY_STEPS = 5` continuation sub-steps ($\Delta s = 0.2$), performing an Euler tangent step + 2 Newton-Raphson corrector steps at *each* sub-step plus a final polishing step (~32 linear $2\times 2$ solves per candidate ball, vs. `Simple`'s single `sqrt`).
+- **When `DE` and `Homotopy` outperform direct solvers**: In 2D line-circle intersection, the polynomial system has degree 2 and a trivial closed-form root (`sqrt`). In higher-dimensional geometric modeling, robotics kinematics, or ray-tracing of higher-degree algebraic surfaces ($d \ge 5$) where no closed-form radical formula exists, computing roots from scratch requires expensive iterative eigenvalue or Gröbner-basis solvers at every frame. In those regimes, local predictor-corrector tracking (`DE`) and homotopy continuation (`Homotopy`) avoid global root-finding altogether and become orders of magnitude faster.
+
 ### Detailed Experimental Investigations (100,000 Runs)
 
 #### 1. Central Loop Fast-Path Frequency (`tracked_fast`)
