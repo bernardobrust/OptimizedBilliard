@@ -143,10 +143,9 @@ function advance_game_physics!(data)
 end
 
 # Measures average nanoseconds per simulated update (`advance_game_physics!` + `f!`) over `reps` steps
-function benchmark_func(f!, source_data, sid::Int32; reps::Int=REPETITIONS, newton_iters::Int=1)
+function benchmark_func(f!, source_data, sid::Int32; reps::Int=REPETITIONS)
     data = deepcopy(source_data)
     DESolution.set_algorithmic_dt!(data.dt_target)
-    DESolution.set_constant_newton_iters!(newton_iters)
     initial_x, initial_y = copy(data.ball_x), copy(data.ball_y)
     initial_vx, initial_vy = copy(data.ball_vx), copy(data.ball_vy)
     # Match the game's fixed-rate aiming update: advance physics, then aim once.
@@ -169,7 +168,6 @@ function benchmark_func(f!, source_data, sid::Int32; reps::Int=REPETITIONS, newt
         step!()
     end
     t_total = time_ns() - t0
-    DESolution.set_constant_newton_iters!(1)
     return t_total / reps
 end
 
@@ -178,12 +176,11 @@ end
 # Experiment 4 Helper: Instruments `DESolution.aim_cue!` to count exact branch
 # frequencies inside the temporal fast-path and central candidate loop.
 # =============================================================================
-function analyze_fastpath_and_loop(source_data, sid::Int32, mode::Symbol; reps::Int=REPETITIONS, newton_iters::Int=1)
+function analyze_fastpath_and_loop(source_data, sid::Int32, mode::Symbol; reps::Int=REPETITIONS)
     data = deepcopy(source_data)
     reset_de_state!()
     DESolution.set_algorithmic_dt!(data.dt_target)
     DESolution.set_predictor_mode!(mode)
-    DESolution.set_constant_newton_iters!(newton_iters)
 
     rad = Float64(data.ball_radius)
     rad_sq = rad * rad
@@ -247,7 +244,7 @@ function analyze_fastpath_and_loop(source_data, sid::Int32, mode::Symbol; reps::
                 x_corr = DESolution.newton_step(x_pred, p, n, c_now, rad)
             else
                 x_pred = (prev_sol[1] + DESolution.PREV_DELTA_X[], prev_sol[2] + DESolution.PREV_DELTA_Y[])
-                x_corr = newton_iters <= 0 ? x_pred : DESolution.newton_step(x_pred, p, n, c_now, rad, newton_iters)
+                x_corr = DESolution.newton_step(x_pred, p, n, c_now, rad)
             end
             newton_move_sq = (x_corr[1] - x_pred[1])^2 + (x_corr[2] - x_pred[2])^2
             err = DESolution.f_error(x_corr, p, n, c_now, rad)
@@ -389,13 +386,102 @@ function advance_trajectory_scene!(d, dt_val::Float64)
     end
 end
 
+# Helper for Experiment 6 ablation: runs Constant (:zero_order) solver with 0, 1, or 2 Newton steps
+# by calling the single-iteration `DESolution.newton_step` 0, 1, or 2 times.
+@inline @fastmath function aim_cue_const_ablation!(data, sid::Int32, ::Val{NIters}) where {NIters}
+    NIters == 1 && return DEConstantSolution.aim_cue!(data, sid)
+    qx = data.cue_x; qy = data.cue_y
+    tx = data.ball_x[sid] + data.track_offset_x
+    ty = data.ball_y[sid] + data.track_offset_y
+    dx = tx - qx; dy = ty - qy
+    data.cue_angle = rad2deg(atan(dy, dx)) - 90.0f0
+    dist_sq = dx * dx + dy * dy
+    if dist_sq <= 1.0f-6
+        data.collision_x = tx; data.collision_y = ty
+        DESolution.PREV_TRACKED_BALL[] = Int32(0)
+        return
+    end
+    dist = sqrt(dist_sq); inv_dist = 1.0f0 / dist
+    ux = dx * inv_dist; uy = dy * inv_dist
+    t_min = dist; hit_x = tx; hit_y = ty
+    rad = Float64(data.ball_radius); rad_sq = rad * rad
+    p = (Float64(qx), Float64(qy)); u = (Float64(ux), Float64(uy)); n = (Float64(uy), -Float64(ux))
+    prev_ball_id = DESolution.PREV_TRACKED_BALL[]
+    prev_sol = (Float64(data.collision_x), Float64(data.collision_y))
+    best_hit_id = Int32(0); tracked_fast = false
+
+    if prev_ball_id != 0 && prev_sol[1] != 0.0
+        j = prev_ball_id
+        c_now = (Float64(data.ball_x[j]), Float64(data.ball_y[j]))
+        x_pred = (prev_sol[1] + DESolution.PREV_DELTA_X[], prev_sol[2] + DESolution.PREV_DELTA_Y[])
+        x_corr = x_pred
+        if NIters >= 1
+            x_corr = DESolution.newton_step(x_corr, p, n, c_now, rad)
+        end
+        if NIters >= 2
+            x_corr = DESolution.newton_step(x_corr, p, n, c_now, rad)
+        end
+        newton_move_sq = (x_corr[1] - x_pred[1])^2 + (x_corr[2] - x_pred[2])^2
+        err = DESolution.f_error(x_corr, p, n, c_now, rad)
+        t_hit = (x_corr[1] - p[1]) * u[1] + (x_corr[2] - p[2]) * u[2]
+        if newton_move_sq < 0.25 && (err[1]^2 + err[2]^2) < 1e-4 && t_hit > 0.0 && t_hit < Float64(t_min)
+            t_min = Float32(t_hit); hit_x = Float32(x_corr[1]); hit_y = Float32(x_corr[2])
+            best_hit_id = j; tracked_fast = true
+        end
+    end
+
+    @inbounds for j in 1:data.num_balls
+        j == sid && continue
+        tracked_fast && j == best_hit_id && continue
+        bx = Float64(data.ball_x[j]); by = Float64(data.ball_y[j])
+        vx = bx - p[1]; vy = by - p[2]
+        t_proj = vx * u[1] + vy * u[2]
+        (t_proj <= -rad || t_proj >= Float64(t_min) + rad) && continue
+        d_perp_sq = (vx * vx + vy * vy) - t_proj * t_proj
+        d_perp_sq >= rad_sq && continue
+        c_now = (bx, by)
+        sol1 = (p[1] + (t_proj - rad) * u[1], p[2] + (t_proj - rad) * u[2])
+        if NIters >= 1
+            sol1 = DESolution.newton_step(sol1, p, n, c_now, rad)
+        end
+        if NIters >= 2
+            sol1 = DESolution.newton_step(sol1, p, n, c_now, rad)
+        end
+        err = DESolution.f_error(sol1, p, n, c_now, rad)
+        found_hit = false
+        if (err[1]^2 + err[2]^2) < 1e-4
+            found_hit = true
+            t_hit = (sol1[1] - p[1]) * u[1] + (sol1[2] - p[2]) * u[2]
+            if t_hit > 0.0 && t_hit < Float64(t_min)
+                t_min = Float32(t_hit); hit_x = Float32(sol1[1]); hit_y = Float32(sol1[2]); best_hit_id = Int32(j)
+            end
+        end
+        if !found_hit
+            h = sqrt(max(0.0, rad_sq - d_perp_sq))
+            t_exact = t_proj - h
+            if t_exact > 0.0 && t_exact < Float64(t_min)
+                t_min = Float32(t_exact)
+                hit_x = Float32(p[1] + t_exact * u[1]); hit_y = Float32(p[2] + t_exact * u[2]); best_hit_id = Int32(j)
+            end
+        end
+    end
+
+    if prev_sol[1] != 0.0 && best_hit_id != 0 && best_hit_id == prev_ball_id
+        DESolution.PREV_DELTA_X[] = Float64(hit_x) - prev_sol[1]
+        DESolution.PREV_DELTA_Y[] = Float64(hit_y) - prev_sol[2]
+    else
+        DESolution.PREV_DELTA_X[] = 0.0; DESolution.PREV_DELTA_Y[] = 0.0
+    end
+    data.collision_x = hit_x; data.collision_y = hit_y
+    DESolution.PREV_TRACKED_BALL[] = best_hit_id
+end
+
 function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newton_iters::Int=1, total_time::Float64=2.0)
     steps = round(Int, total_time / dt_val)
     d_sim = make_trajectory_scene(dt_val)
     d_ref = make_trajectory_scene(dt_val)
     reset_de_state!()
     DESolution.set_algorithmic_dt!(dt_val)
-    DESolution.set_constant_newton_iters!(newton_iters)
     mode === nothing || DESolution.set_predictor_mode!(mode)
 
     max_err_simple = 0.0
@@ -435,7 +521,10 @@ function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newto
                 x_corr = DESolution.newton_step(x_pred, p, n, c_now, rad)
             else
                 x_pred = (prev_sol[1] + DESolution.PREV_DELTA_X[], prev_sol[2] + DESolution.PREV_DELTA_Y[])
-                x_corr = newton_iters <= 0 ? x_pred : DESolution.newton_step(x_pred, p, n, c_now, rad, newton_iters)
+                x_corr = x_pred
+                for _ in 1:newton_iters
+                    x_corr = DESolution.newton_step(x_corr, p, n, c_now, rad)
+                end
             end
             move_sq = (x_corr[1] - x_pred[1])^2 + (x_corr[2] - x_pred[2])^2
             err = DESolution.f_error(x_corr, p, n, c_now, rad)
@@ -445,7 +534,11 @@ function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newto
             end
         end
 
-        aim!(d_sim, Int32(1))
+        if mode == :zero_order && newton_iters != 1
+            aim_cue_const_ablation!(d_sim, Int32(1), Val(newton_iters))
+        else
+            aim!(d_sim, Int32(1))
+        end
         SimpleSolution.aim_cue!(d_ref, Int32(1))
 
         # Exact Float64 reference (quantized to Float32 output storage to isolate algorithmic error)
@@ -476,7 +569,6 @@ function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newto
         advance_trajectory_scene!(d_ref, dt_val)
     end
 
-    DESolution.set_constant_newton_iters!(1)
     DESolution.set_algorithmic_dt!(1.0 / 120.0)
 
     return (
@@ -745,14 +837,14 @@ function run_all_benchmarks()
     for dt_val in (1.0/120.0, 1.0/600.0, 1.0/1200.0, 1.0/6000.0)
         d_dt = create_data(Int32(16); blocked=true, dt_target=dt_val)
         for n_iters in (2, 1, 0)
+            f_ablation! = n_iters == 1 ? DEConstantSolution.aim_cue! : ((d, s) -> aim_cue_const_ablation!(d, s, Val(n_iters)))
             acc = evaluate_trajectory_accuracy(DEConstantSolution.aim_cue!, dt_val; mode=:zero_order, newton_iters=n_iters, total_time=5.0)
-            lat = benchmark_func(DEConstantSolution.aim_cue!, d_dt, Int32(1); reps=20_000, newton_iters=n_iters)
+            lat = benchmark_func(f_ablation!, d_dt, Int32(1); reps=20_000)
             @printf("  | %9.2e | %12d | %12.2f%% | %19.6f | %22.6f | %22.6f | %12.1f |\n",
                     dt_val, n_iters, acc.fast_pct, acc.rmse_simple, acc.max_err_simple, acc.rmse_f64, lat)
         end
 
     end
-    DESolution.set_constant_newton_iters!(1)
     DESolution.set_algorithmic_dt!(1.0 / 120.0)
 
     println("\n  B) `track_continuation` Validation across perpendicular offsets d_perp in [0, R):")

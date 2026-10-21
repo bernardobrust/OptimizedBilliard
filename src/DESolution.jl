@@ -66,14 +66,7 @@ const PREDICTOR_MODE = Ref{Symbol}(:zero_order) # :zero_order, :euler, or :rk4
 const PREV_DELTA_X = Ref{Float64}(0.0)
 const PREV_DELTA_Y = Ref{Float64}(0.0)
 const ALGORITHMIC_DT = Ref{Float64}(1.0 / 120.0)
-
-# Number of Newton corrector iterations used by the Constant (:zero_order) predictor.
-# Default is 1 (reduced from 2 in the initial implementation; can be set to 0, 1, or 2 for accuracy experiments).
-const CONSTANT_NEWTON_ITERS = Ref{Int}(1)
-
 set_algorithmic_dt!(dt::Real) = (ALGORITHMIC_DT[] = Float64(dt))
-set_constant_newton_iters!(n::Int) = (CONSTANT_NEWTON_ITERS[] = n)
-get_constant_newton_iters()::Int = CONSTANT_NEWTON_ITERS[]
 
 function set_predictor_mode!(mode::Symbol)
     if mode in (:rk4, :zero_order, :euler)
@@ -198,25 +191,21 @@ end
     return (-sol[1], -sol[2])
 end
 
-# Newton-Raphson corrector step:
+# Newton-Raphson corrector step (single iteration):
 # X_{k+1} = X_k - J(X_k)⁻¹ * f(X_k)
-# Supports `iters` iterations (default 1; compile-time constant 1 unrolls to a single step).
 @inline @fastmath function newton_step(
     x::Tuple{Float64,Float64},
     p::Tuple{Float64,Float64},
     n::Tuple{Float64,Float64},
     c::Tuple{Float64,Float64},
-    rad::Float64,
-    iters::Int=1
+    rad::Float64
 )::Tuple{Float64,Float64}
     curr = x
 
-    for _ in 1:iters
-        f = f_error(curr, p, n, c, rad)
-        J = jacobian(curr, n, c)
-        dx = solve_2x2(J, f)
-        curr = (curr[1] - dx[1], curr[2] - dx[2])
-    end
+    f = f_error(curr, p, n, c, rad)
+    J = jacobian(curr, n, c)
+    dx = solve_2x2(J, f)
+    curr = (curr[1] - dx[1], curr[2] - dx[2])
 
     return curr
 end
@@ -293,14 +282,7 @@ end
     c_next::Tuple{Float64,Float64},
     rad::Float64
 )::Tuple{Float64,Float64}
-    n_iters = CONSTANT_NEWTON_ITERS[]
-    if n_iters == 1
-        return newton_step(x, p_next, n_next, c_next, rad, 1)
-    elseif n_iters <= 0
-        return x
-    else
-        return newton_step(x, p_next, n_next, c_next, rad, n_iters)
-    end
+    return newton_step(x, p_next, n_next, c_next, rad)
 end
 
 # 1st-order Predictor-Corrector: 4th-order Runge-Kutta numerical integration predictor
@@ -382,14 +364,9 @@ end
     s = 0.0
 
     if PREDICTOR_MODE[] == :zero_order
-        n_iters = CONSTANT_NEWTON_ITERS[]
         @inbounds for _ in 1:steps
             c_next = (c_start[1] + (s + ds) * dc_ds[1], c_start[2] + (s + ds) * dc_ds[2])
-            if n_iters == 1
-                x_curr = newton_step(x_curr, p, n, c_next, rad, 1)
-            elseif n_iters > 1
-                x_curr = newton_step(x_curr, p, n, c_next, rad, n_iters)
-            end
+            x_curr = newton_step(x_curr, p, n, c_next, rad)
             s += ds
         end
         return x_curr
@@ -623,19 +600,13 @@ end
             else
                 x_pred = euler_step(prev_sol, p, dp_dt, n_prev, dn_dt, c_prev, dc_dt, dt)
             end
-            x_corr = newton_step(x_pred, p, n, c_now, rad)
         else
             # 0th-order (Constant) predictor with finite-difference displacement extrapolation
             x_pred = (prev_sol[1] + PREV_DELTA_X[], prev_sol[2] + PREV_DELTA_Y[])
-            n_iters = CONSTANT_NEWTON_ITERS[]
-            if n_iters == 1
-                x_corr = newton_step(x_pred, p, n, c_now, rad, 1)
-            elseif n_iters <= 0
-                x_corr = x_pred
-            else
-                x_corr = newton_step(x_pred, p, n, c_now, rad, n_iters)
-            end
         end
+
+        # Newton corrector step
+        x_corr = newton_step(x_pred, p, n, c_now, rad)
 
         # Validate fast-path convergence: small corrector shift and small nonlinear residual
         newton_move_sq = (x_corr[1] - x_pred[1])^2 + (x_corr[2] - x_pred[2])^2

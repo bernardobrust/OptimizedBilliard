@@ -83,7 +83,6 @@ end
 function run_series(name, aim!, mode=nothing)
     d = make_scene()
     DESolution.set_algorithmic_dt!(STEP)
-    DESolution.set_constant_newton_iters!(1)
     mode === nothing || DESolution.set_predictor_mode!(mode)
     DESolution.PREV_TRACKED_BALL[] = 0
     DESolution.PREV_DELTA_X[] = 0.0

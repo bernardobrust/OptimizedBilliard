@@ -86,11 +86,11 @@ SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):
 -----------------------------------------------------------------
 | Solution         | Update (ns) | Relative latency |
 |:-----------------|------------:|-----------------:|
-| Simple           |       129.0 |             1.00x |
-| DE (Constant)    |       175.0 |             1.36x |
-| DE (Euler)       |       156.0 |             1.21x |
-| DE (RK4)         |       164.0 |             1.27x |
-| Homotopy         |       340.0 |             2.64x |
+| Simple           |       128.9 |             1.00x |
+| DE (Constant)    |       145.2 |             1.13x |
+| DE (Euler)       |       149.7 |             1.16x |
+| DE (RK4)         |       156.0 |             1.21x |
+| Homotopy         |       353.0 |             2.74x |
 -----------------------------------------------------------------
 ```
 
@@ -130,7 +130,7 @@ Simple is expected to do well here: it evaluates inexpensive closed-form line-ci
 In `DESolution.aim_cue!`, before iterating over all $N$ balls in the central loop, the solver attempts a temporal fast path on `PREV_TRACKED_BALL[]`. When `newton_move_sq < 0.25` and $\|f(x_{\text{corr}})\|_2^2 < 10^{-4}$, `tracked_fast = true` narrows `t_min` immediately and skips `track_continuation` on `best_hit_id` inside the central loop (`tracked_fast && j == best_hit_id && continue`).
 
 Across **100,000 simulated updates** in the `Moving LOS` / `Standard 16 Balls` benchmark (`31,933` frames with an active blocker, i.e., `31.9%` of all frames):
-- **`DE (Constant)`**: takes the fast path on **28,741 / 31,933** blocked frames (**90.00%** of eligible frames, **28.74%** of all frames), calling `track_continuation` `5,021` times in the central loop.
+- **`DE (Constant)`**: takes the fast path on **28,721 / 31,933** blocked frames (**89.94%** of eligible frames, **28.72%** of all frames), calling `track_continuation` `5,196` times in the central loop.
 - **`DE (Euler)`**: takes the fast path on **30,006 / 31,933** blocked frames (**93.97%** of eligible frames, **30.01%** of all frames), calling `track_continuation` `3,797` times.
 - **`DE (RK4)`**: takes the fast path on **31,499 / 31,933** blocked frames (**98.64%** of eligible frames, **31.50%** of all frames), calling `track_continuation` only `2,171` times (with an `86.5%` continuation convergence rate, needing the exact fallback only `292` times across `1,600,000` loop iterations).
 
@@ -140,8 +140,8 @@ Decreasing $\Delta t$ from $1/120\text{ s}$ ($8.33 \times 10^{-3}\text{ s}$) dow
 - **Accuracy Scaling**: Against the exact `Float64` reference (quantized to `Float32` output), `DE (RK4)` maintains a flat floor of $\text{RMSE} \approx 1.0 \times 10^{-5}\text{ px}$ across all $\Delta t$, while `DE (Constant)` and `DE (Euler)` improve from $\text{RMSE} \approx 2.0 \times 10^{-4}\text{ px}$ at $120\text{ Hz}$ down to $3.9 \times 10^{-5}\text{ px}$ and $2.1 \times 10^{-5}\text{ px}$ at $6000\text{ Hz}$.
 
 #### 3. Constant Predictor Newton Iteration Ablation (2 vs. 1 vs. 0 Iterations)
-We validated the impact of reducing the number of Newton-Raphson corrector iterations in `DE (Constant)` (`set_constant_newton_iters!`) as well as eliminating the redundant second `track_continuation` call on `r_exit`:
-- **2 → 1 Newton Iteration**: At $\Delta t = 1/120\text{ s}$, reducing from `2` Newton iterations to `1` preserves identical maximum error vs. `Simple` (`0.002458 px`) and virtually identical RMSE (`0.000284 px` vs. `0.000270 px`, or `0.000127 px` vs. `0.000110 px` against exact `Float64`), while maintaining a **96.27%** fast-path hit rate and reducing update latency (`~155 ns` vs. `~174 ns`).
+We validated the impact of reducing the number of Newton-Raphson corrector iterations in `DE (Constant)` (`newton_step` strictly executing a single iteration) as well as eliminating the redundant second `track_continuation` call on `r_exit`:
+- **2 → 1 Newton Iteration**: At $\Delta t = 1/120\text{ s}$, reducing from `2` Newton iterations to `1` preserves identical maximum error vs. `Simple` (`0.002458 px`) and virtually identical RMSE (`0.000284 px` vs. `0.000270 px`, or `0.000127 px` vs. `0.000110 px` against exact `Float64`), while maintaining a **96.27%** fast-path hit rate and cutting update latency from `~220.8 ns` to **`~146.2 ns`**.
 - **1 → 0 Newton Iterations (Predictor-Only)**: Removing the remaining Newton corrector step from the fast path (`0` iterations, pure linear extrapolation `x_corr = prev_sol + PREV_DELTA`) causes $\|f(x_{\text{corr}})\|_2^2 \ge 10^{-4}$ on every frame at $\Delta t = 1/120\text{ s}$ (**0.00%** fast-path hit rate, forcing 100% fallback to the central loop; if the residual check is also disabled, the uncorrected tangent extrapolation diverges to `374.0 px` error). At very small timesteps ($\Delta t = 1.67 \times 10^{-4}\text{ s}$), even `0` Newton iterations in the fast path achieves a **57.08%** fast-path hit rate with `RMSE = 0.000319 px`.
 
 #### 4. Mathematical & Numerical Validation of `track_continuation`
