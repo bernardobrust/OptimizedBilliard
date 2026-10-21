@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <text x="400.0" y="38" text-anchor="middle" font-size="20" font-weight="bold" fill="#212121">Approximation Error (RMSE) vs. Timestep dt</text>
+  <line x1="95" y1="450.0" x2="640" y2="450.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="454.0" text-anchor="end" font-size="12" fill="#616161">0.0</text>
+  <line x1="95" y1="374.0" x2="640" y2="374.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="378.0" text-anchor="end" font-size="12" fill="#616161">2.0e-5</text>
+  <line x1="95" y1="298.0" x2="640" y2="298.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="302.0" text-anchor="end" font-size="12" fill="#616161">4.0e-5</text>
+  <line x1="95" y1="221.99999999999997" x2="640" y2="221.99999999999997" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="225.99999999999997" text-anchor="end" font-size="12" fill="#616161">6.0e-5</text>
+  <line x1="95" y1="146.0" x2="640" y2="146.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="150.0" text-anchor="end" font-size="12" fill="#616161">8.0e-5</text>
+  <line x1="95" y1="70.0" x2="640" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="74.0" text-anchor="end" font-size="12" fill="#616161">0.0001</text>
+  <line x1="95.0" y1="70" x2="95.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="95.0" y1="450" x2="95.0" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="95.0" y="474" text-anchor="middle" font-size="12" fill="#424242">1/120s</text>
+  <line x1="185.83333333333331" y1="70" x2="185.83333333333331" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="185.83333333333331" y1="450" x2="185.83333333333331" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="185.83333333333331" y="474" text-anchor="middle" font-size="12" fill="#424242">1/240s</text>
+  <line x1="276.66666666666663" y1="70" x2="276.66666666666663" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="276.66666666666663" y1="450" x2="276.66666666666663" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="276.66666666666663" y="474" text-anchor="middle" font-size="12" fill="#424242">1/600s</text>
+  <line x1="367.5" y1="70" x2="367.5" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="367.5" y1="450" x2="367.5" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="367.5" y="474" text-anchor="middle" font-size="12" fill="#424242">1/1200s</text>
+  <line x1="458.3333333333333" y1="70" x2="458.3333333333333" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="458.3333333333333" y1="450" x2="458.3333333333333" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="458.3333333333333" y="474" text-anchor="middle" font-size="12" fill="#424242">1/2400s</text>
+  <line x1="549.1666666666667" y1="70" x2="549.1666666666667" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="549.1666666666667" y1="450" x2="549.1666666666667" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="549.1666666666667" y="474" text-anchor="middle" font-size="12" fill="#424242">1/6000s</text>
+  <line x1="640.0" y1="70" x2="640.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="640.0" y1="450" x2="640.0" y2="456" stroke="#424242" stroke-width="1.5"/>
+  <text x="640.0" y="474" text-anchor="middle" font-size="12" fill="#424242">1/12000s</text>
+  <line x1="95" y1="70" x2="95" y2="450" stroke="#424242" stroke-width="1.5"/>
+  <line x1="95" y1="450" x2="640" y2="450" stroke="#424242" stroke-width="1.5"/>
+  <text x="367.5" y="504" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Timestep dt (from 1/120 s down to 1/12000 s)</text>
+  <text transform="rotate(-90)" x="-260.0" y="24" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">RMSE vs. Exact Reference (px)</text>
+  <path d="M 95.0 108.1 L 185.8 259.0 L 276.7 325.0 L 367.5 359.6 L 458.3 379.3 L 549.2 393.1 L 640.0 398.3 " fill="none" stroke="#1976D2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="108.1" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="185.8" cy="259.0" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="276.7" cy="325.0" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="367.5" cy="359.6" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="458.3" cy="379.3" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="549.2" cy="393.1" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="398.3" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 199.3 L 185.8 271.3 L 276.7 331.5 L 367.5 359.9 L 458.3 379.3 L 549.2 393.1 L 640.0 398.3 " fill="none" stroke="#00897B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="199.3" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="185.8" cy="271.3" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="276.7" cy="331.5" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="367.5" cy="359.9" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="458.3" cy="379.3" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="549.2" cy="393.1" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="398.3" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 401.5 L 185.8 409.7 L 276.7 406.4 L 367.5 404.6 L 458.3 405.7 L 549.2 405.0 L 640.0 404.6 " fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="401.5" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="185.8" cy="409.7" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="276.7" cy="406.4" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="367.5" cy="404.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="458.3" cy="405.7" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="549.2" cy="405.0" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="404.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <rect x="660" y="80" width="135" height="94" rx="6" fill="#F8F9FA" stroke="#E0E0E0" stroke-width="1"/>
+  <line x1="672" y1="94" x2="692" y2="94" stroke="#1976D2" stroke-width="3"/>
+  <circle cx="682" cy="94" r="4" fill="#1976D2"/>
+  <text x="700" y="98" font-size="12" font-weight="500" fill="#333333">DE (Constant)</text>
+  <line x1="672" y1="120" x2="692" y2="120" stroke="#00897B" stroke-width="3"/>
+  <circle cx="682" cy="120" r="4" fill="#00897B"/>
+  <text x="700" y="124" font-size="12" font-weight="500" fill="#333333">DE (Euler)</text>
+  <line x1="672" y1="146" x2="692" y2="146" stroke="#E65100" stroke-width="3"/>
+  <circle cx="682" cy="146" r="4" fill="#E65100"/>
+  <text x="700" y="150" font-size="12" font-weight="500" fill="#333333">DE (RK4)</text>
+</svg>

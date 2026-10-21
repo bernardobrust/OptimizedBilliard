@@ -787,18 +787,24 @@ function run_all_benchmarks()
     )
 
     # -------------------------------------------------------------------------
-    # Experiment 5: Very Low Timestep (`dt`) Experiments
+    # Experiment 5: Very Low Timestep (`dt`) Experiments (Fast-Path & Accuracy)
     # -------------------------------------------------------------------------
     println("\n[5/6] Running experiments with very small timesteps (low dt)...")
     freq_multipliers = [120, 240, 600, 1200, 2400, 6000, 12000]
+    dt_labels = ["1/120s", "1/240s", "1/600s", "1/1200s", "1/2400s", "1/6000s", "1/12000s"]
     low_dt_fastpath = Dict{String, Vector{Float64}}(
         "DE (Constant)" => Float64[],
         "DE (Euler)"    => Float64[],
         "DE (RK4)"      => Float64[]
     )
+    low_dt_accuracy = Dict{String, Vector{Float64}}(
+        "DE (Constant)" => Float64[],
+        "DE (Euler)"    => Float64[],
+        "DE (RK4)"      => Float64[]
+    )
 
-    println("  | Rate (Hz) |    dt (s)   | Method        | Fast-Path (%) | RMSE vs F64 (px) | Max Err vs F64 (px) | Latency (ns) |")
-    println("  |----------:|------------:|:--------------|--------------:|-----------------:|--------------------:|-------------:|")
+    println("  | Rate (Hz) |    dt (s)   | Method        | Fast-Path (%) | Smooth RMSE (px) | Full RMSE (px) | Latency (ns) |")
+    println("  |----------:|------------:|:--------------|--------------:|-----------------:|---------------:|-------------:|")
     for hz in freq_multipliers
         dt_val = 1.0 / Float64(hz)
         d_dt = create_data(Int32(16); blocked=true, dt_target=dt_val)
@@ -807,23 +813,46 @@ function run_all_benchmarks()
             ("DE (Euler)",    DEEulerSolution.aim_cue!,    :euler),
             ("DE (RK4)",      DERK4Solution.aim_cue!,      :rk4)
         )
-            acc = evaluate_trajectory_accuracy(f!, dt_val; mode=m_sym, newton_iters=1, total_time=2.0)
+            acc_full = evaluate_trajectory_accuracy(f!, dt_val; mode=m_sym, newton_iters=1, total_time=2.0)
+            acc_smooth = evaluate_trajectory_accuracy(f!, dt_val; mode=m_sym, newton_iters=1, total_time=1.0)
             lat = benchmark_func(f!, d_dt, Int32(1); reps=20_000)
-            push!(low_dt_fastpath[m_name], acc.fast_pct)
-            @printf("  | %9d | %11.2e | %-13s | %12.2f%% | %16.6f | %19.6f | %12.1f |\n",
-                    hz, dt_val, m_name, acc.fast_pct, acc.rmse_f64, acc.max_err_f64, lat)
+            push!(low_dt_fastpath[m_name], acc_full.fast_pct)
+            push!(low_dt_accuracy[m_name], acc_smooth.rmse_f64)
+            @printf("  | %9d | %11.2e | %-13s | %12.2f%% | %16.6f | %14.6f | %12.1f |\n",
+                    hz, dt_val, m_name, acc_full.fast_pct, acc_smooth.rmse_f64, acc_full.rmse_f64, lat)
         end
     end
 
-    out_low_dt = joinpath(dir, "results_low_dt.svg")
+    out_low_dt_fp = joinpath(dir, "results_low_dt_fastpath.svg")
     PlotUtils.plot_line(
-        "Fast-Path Hit Rate vs. Simulation Frequency (1/dt)",
-        "Simulation Frequency 1/dt (Hz)",
+        "Fast-Path Hit Rate vs. Timestep dt",
+        "Timestep dt (from 1/120 s down to 1/12000 s)",
         "Fast-Path Hit Rate (%)",
         freq_multipliers,
         low_dt_fastpath,
         colors,
-        out_low_dt
+        out_low_dt_fp;
+        min_y_override=95.0,
+        max_y_override=100.5,
+        y_digits=1,
+        even_x_spacing=true,
+        x_labels=dt_labels
+    )
+
+    out_low_dt_acc = joinpath(dir, "results_low_dt_accuracy.svg")
+    PlotUtils.plot_line(
+        "Approximation Error (RMSE) vs. Timestep dt",
+        "Timestep dt (from 1/120 s down to 1/12000 s)",
+        "RMSE vs. Exact Reference (px)",
+        freq_multipliers,
+        low_dt_accuracy,
+        colors,
+        out_low_dt_acc;
+        min_y_override=0.0,
+        max_y_override=0.00010,
+        y_digits=5,
+        even_x_spacing=true,
+        x_labels=dt_labels
     )
 
     # -------------------------------------------------------------------------

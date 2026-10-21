@@ -86,11 +86,11 @@ SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):
 -----------------------------------------------------------------
 | Solution         | Update (ns) | Relative latency |
 |:-----------------|------------:|-----------------:|
-| Simple           |       128.9 |             1.00x |
-| DE (Constant)    |       145.2 |             1.13x |
-| DE (Euler)       |       149.7 |             1.16x |
-| DE (RK4)         |       156.0 |             1.21x |
-| Homotopy         |       353.0 |             2.74x |
+| Simple           |       130.3 |             1.00x |
+| DE (Constant)    |       142.4 |             1.09x |
+| DE (Euler)       |       145.9 |             1.12x |
+| DE (RK4)         |       160.6 |             1.23x |
+| Homotopy         |       339.2 |             2.60x |
 -----------------------------------------------------------------
 ```
 
@@ -104,7 +104,9 @@ These figures vary by machine and runtime (measured over `REPETITIONS = 100,000`
 
 ![Fast-path hit rate across operational scenarios](experiments/results_fastpath.svg)
 
-![Fast-path hit rate scaling with simulation frequency 1/dt](experiments/results_low_dt.svg)
+![Fast-path hit rate vs timestep dt](experiments/results_low_dt_fastpath.svg)
+
+![Approximation error (RMSE) vs timestep dt](experiments/results_low_dt_accuracy.svg)
 
 The methods solve the same geometric first-hit problem, so their tracked paths nearly overlap. In the 600-frame experiment, each DE and Homotopy path differs from the Simple reference by at most about 0.003 pixels. The experiment CSV records the hit type for every frame.
 

@@ -38,12 +38,17 @@ function plot_line(
     x_vals::Vector{Int},
     series::Dict{String, Vector{Float64}},
     colors::Dict{String, String},
-    out_svg::String
+    out_svg::String;
+    min_y_override::Union{Nothing,Float64}=nothing,
+    max_y_override::Union{Nothing,Float64}=nothing,
+    y_digits::Int=0,
+    even_x_spacing::Bool=false,
+    x_labels::Union{Nothing,Vector{String}}=nothing
 )
     # Canvas and plot-area layout dimensions in pixels
     w = 800
     h = 520
-    pad_left = 90
+    pad_left = 95
     pad_right = 160
     pad_top = 70
     pad_bottom = 70
@@ -51,19 +56,22 @@ function plot_line(
     plot_w = w - pad_left - pad_right
     plot_h = h - pad_top - pad_bottom
 
-    # Compute vertical axis range [0, 1.15 * max_y]
+    # Compute vertical axis range
     all_y = Float64[]
     for (k, v) in series
         append!(all_y, v)
     end
-    min_y = 0.0
-    max_y = maximum(all_y) * 1.15
+    min_y = min_y_override === nothing ? 0.0 : min_y_override
+    max_y = max_y_override === nothing ? maximum(all_y) * 1.15 : max_y_override
 
-    # Horizontal axis bounds and linear data-to-pixel coordinate transforms
+    # Horizontal axis bounds and data-to-pixel coordinate transforms
     min_x = minimum(x_vals)
     max_x = maximum(x_vals)
+    n_x = length(x_vals)
 
-    x_to_px(x) = pad_left + (x - min_x) / (max_x - min_x) * plot_w
+    idx_to_px(idx) = even_x_spacing ?
+        (pad_left + (idx - 1) / max(1, n_x - 1) * plot_w) :
+        (pad_left + (x_vals[idx] - min_x) / (max_x - min_x) * plot_w)
     y_to_px(y) = pad_top + plot_h - (y - min_y) / (max_y - min_y) * plot_h
 
 
@@ -77,16 +85,18 @@ function plot_line(
     for i in 0:n_ticks
         y_val = min_y + i * (max_y - min_y) / n_ticks
         py = y_to_px(y_val)
+        y_lbl = y_digits <= 0 ? string(round(Int, y_val)) : string(round(y_val, digits=y_digits))
         println(io, """  <line x1="$pad_left" y1="$py" x2="$(pad_left + plot_w)" y2="$py" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>""")
-        println(io, """  <text x="$(pad_left - 12)" y="$(py + 4)" text-anchor="end" font-size="12" fill="#616161">$(round(Int, y_val))</text>""")
+        println(io, """  <text x="$(pad_left - 12)" y="$(py + 4)" text-anchor="end" font-size="12" fill="#616161">$y_lbl</text>""")
     end
 
     # X-ticks
-    for x in x_vals
-        px = x_to_px(x)
+    for (idx, x) in enumerate(x_vals)
+        px = idx_to_px(idx)
+        lbl = x_labels === nothing ? string(x) : x_labels[idx]
         println(io, """  <line x1="$px" y1="$pad_top" x2="$px" y2="$(pad_top + plot_h)" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>""")
         println(io, """  <line x1="$px" y1="$(pad_top + plot_h)" x2="$px" y2="$(pad_top + plot_h + 6)" stroke="#424242" stroke-width="1.5"/>""")
-        println(io, """  <text x="$px" y="$(pad_top + plot_h + 24)" text-anchor="middle" font-size="13" fill="#424242">$x</text>""")
+        println(io, """  <text x="$px" y="$(pad_top + plot_h + 24)" text-anchor="middle" font-size="12" fill="#424242">$lbl</text>""")
     end
 
     # Axis lines
@@ -95,7 +105,7 @@ function plot_line(
 
     # Axis Labels
     println(io, """  <text x="$(pad_left + plot_w / 2)" y="$(h - 16)" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">$x_label</text>""")
-    println(io, """  <text transform="rotate(-90)" x="$(-pad_top - plot_h / 2)" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">$y_label</text>""")
+    println(io, """  <text transform="rotate(-90)" x="$(-pad_top - plot_h / 2)" y="24" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">$y_label</text>""")
 
     # Draw series lines and points
     names = collect(keys(series))
@@ -107,7 +117,7 @@ function plot_line(
         # Path
         path_str = ""
         for (idx, x) in enumerate(x_vals)
-            px = x_to_px(x)
+            px = idx_to_px(idx)
             py = y_to_px(pts[idx])
             cmd = idx == 1 ? "M" : "L"
             path_str *= "$cmd $(round(px, digits=1)) $(round(py, digits=1)) "
@@ -116,7 +126,7 @@ function plot_line(
 
         # Circles on points
         for (idx, x) in enumerate(x_vals)
-            px = x_to_px(x)
+            px = idx_to_px(idx)
             py = y_to_px(pts[idx])
             println(io, """  <circle cx="$(round(px, digits=1))" cy="$(round(py, digits=1))" r="4.5" fill="$col" stroke="#FFFFFF" stroke-width="1.5"/>""")
         end
