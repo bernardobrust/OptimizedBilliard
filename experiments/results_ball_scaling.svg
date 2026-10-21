@@ -4,15 +4,15 @@
   <line x1="95" y1="450.0" x2="640" y2="450.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
   <text x="83" y="454.0" text-anchor="end" font-size="12" fill="#616161">0</text>
   <line x1="95" y1="374.0" x2="640" y2="374.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="83" y="378.0" text-anchor="end" font-size="12" fill="#616161">459</text>
+  <text x="83" y="378.0" text-anchor="end" font-size="12" fill="#616161">471</text>
   <line x1="95" y1="298.0" x2="640" y2="298.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="83" y="302.0" text-anchor="end" font-size="12" fill="#616161">917</text>
-  <line x1="95" y1="221.99999999999997" x2="640" y2="221.99999999999997" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="83" y="225.99999999999997" text-anchor="end" font-size="12" fill="#616161">1376</text>
+  <text x="83" y="302.0" text-anchor="end" font-size="12" fill="#616161">942</text>
+  <line x1="95" y1="222.0" x2="640" y2="222.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="83" y="226.0" text-anchor="end" font-size="12" fill="#616161">1413</text>
   <line x1="95" y1="146.0" x2="640" y2="146.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="83" y="150.0" text-anchor="end" font-size="12" fill="#616161">1834</text>
+  <text x="83" y="150.0" text-anchor="end" font-size="12" fill="#616161">1884</text>
   <line x1="95" y1="70.0" x2="640" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="83" y="74.0" text-anchor="end" font-size="12" fill="#616161">2293</text>
+  <text x="83" y="74.0" text-anchor="end" font-size="12" fill="#616161">2355</text>
   <line x1="95.0" y1="70" x2="95.0" y2="450" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
   <line x1="95.0" y1="450" x2="95.0" y2="456" stroke="#424242" stroke-width="1.5"/>
   <text x="95.0" y="474" text-anchor="middle" font-size="12" fill="#424242">4</text>
@@ -32,36 +32,36 @@
   <line x1="95" y1="450" x2="640" y2="450" stroke="#424242" stroke-width="1.5"/>
   <text x="367.5" y="504" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Number of Balls on Table</text>
   <text transform="rotate(-90)" x="-260.0" y="24" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Latency (ns / simulated update)</text>
-  <path d="M 95.0 443.3 L 131.3 438.5 L 204.0 425.7 L 349.3 380.2 L 640.0 204.1 " fill="none" stroke="#1976D2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="95.0" cy="443.3" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="131.3" cy="438.5" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="204.0" cy="425.7" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="349.3" cy="380.2" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="640.0" cy="204.1" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
-  <path d="M 95.0 443.0 L 131.3 438.2 L 204.0 425.6 L 349.3 380.1 L 640.0 204.6 " fill="none" stroke="#00897B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="95.0" cy="443.0" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="131.3" cy="438.2" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="204.0" cy="425.6" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="349.3" cy="380.1" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="640.0" cy="204.6" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <path d="M 95.0 442.8 L 131.3 437.7 L 204.0 424.6 L 349.3 378.6 L 640.0 200.4 " fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 95.0 443.2 L 131.3 438.8 L 204.0 426.4 L 349.3 383.0 L 640.0 204.4 " fill="none" stroke="#1976D2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="443.2" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="131.3" cy="438.8" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="204.0" cy="426.4" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="349.3" cy="383.0" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="204.4" r="4.5" fill="#1976D2" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 443.2 L 131.3 438.4 L 204.0 426.6 L 349.3 380.2 L 640.0 208.2 " fill="none" stroke="#00897B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="443.2" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="131.3" cy="438.4" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="204.0" cy="426.6" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="349.3" cy="380.2" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="208.2" r="4.5" fill="#00897B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 442.8 L 131.3 438.0 L 204.0 425.5 L 349.3 379.4 L 640.0 206.2 " fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="95.0" cy="442.8" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="131.3" cy="437.7" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="204.0" cy="424.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="349.3" cy="378.6" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="640.0" cy="200.4" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
-  <path d="M 95.0 437.3 L 131.3 424.8 L 204.0 393.8 L 349.3 316.7 L 640.0 119.6 " fill="none" stroke="#C2185B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="95.0" cy="437.3" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="131.3" cy="424.8" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="204.0" cy="393.8" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="349.3" cy="316.7" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="131.3" cy="438.0" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="204.0" cy="425.5" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="349.3" cy="379.4" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="206.2" r="4.5" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 437.6 L 131.3 425.5 L 204.0 392.5 L 349.3 317.7 L 640.0 119.6 " fill="none" stroke="#C2185B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="437.6" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="131.3" cy="425.5" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="204.0" cy="392.5" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="349.3" cy="317.7" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
   <circle cx="640.0" cy="119.6" r="4.5" fill="#C2185B" stroke="#FFFFFF" stroke-width="1.5"/>
-  <path d="M 95.0 444.5 L 131.3 440.6 L 204.0 429.9 L 349.3 388.4 L 640.0 218.3 " fill="none" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="95.0" cy="444.5" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="131.3" cy="440.6" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="204.0" cy="429.9" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="349.3" cy="388.4" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
-  <circle cx="640.0" cy="218.3" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M 95.0 444.6 L 131.3 440.8 L 204.0 430.3 L 349.3 388.7 L 640.0 230.0 " fill="none" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="95.0" cy="444.6" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="131.3" cy="440.8" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="204.0" cy="430.3" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="349.3" cy="388.7" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="640.0" cy="230.0" r="4.5" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1.5"/>
   <rect x="660" y="80" width="135" height="146" rx="6" fill="#F8F9FA" stroke="#E0E0E0" stroke-width="1"/>
   <line x1="672" y1="94" x2="692" y2="94" stroke="#1976D2" stroke-width="3"/>
   <circle cx="682" cy="94" r="4" fill="#1976D2"/>
