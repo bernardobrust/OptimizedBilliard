@@ -557,8 +557,8 @@ function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newto
 
         err_s = hypot(Float64(d_sim.collision_x) - Float64(d_ref.collision_x),
                       Float64(d_sim.collision_y) - Float64(d_ref.collision_y))
-        err_e = hypot(Float64(d_sim.collision_x) - Float64(Float32(hx64)),
-                      Float64(d_sim.collision_y) - Float64(Float32(hy64)))
+        err_e = hypot(Float64(d_sim.collision_x) - hx64,
+                      Float64(d_sim.collision_y) - hy64)
 
         max_err_simple = max(max_err_simple, err_s)
         sum_sq_simple += err_s^2
@@ -787,11 +787,11 @@ function run_all_benchmarks()
     )
 
     # -------------------------------------------------------------------------
-    # Experiment 5: Very Low Timestep (`dt`) Experiments (Fast-Path & Accuracy)
+    # Experiment 5: Timestep (`dt`) Scaling from 1/1s down to 1/1200s (Fast-Path & Accuracy)
     # -------------------------------------------------------------------------
-    println("\n[5/6] Running experiments with very small timesteps (low dt)...")
-    freq_multipliers = [120, 240, 600, 1200, 2400, 6000, 12000]
-    dt_labels = ["1/120s", "1/240s", "1/600s", "1/1200s", "1/2400s", "1/6000s", "1/12000s"]
+    println("\n[5/6] Running experiments across timesteps dt (from 1/1s down to 1/1200s)...")
+    freq_multipliers = [1, 10, 30, 60, 120, 240, 600, 1200]
+    dt_labels = ["1/1s", "1/10s", "1/30s", "1/60s", "1/120s", "1/240s", "1/600s", "1/1200s"]
     low_dt_fastpath = Dict{String, Vector{Float64}}(
         "DE (Constant)" => Float64[],
         "DE (Euler)"    => Float64[],
@@ -826,15 +826,15 @@ function run_all_benchmarks()
     out_low_dt_fp = joinpath(dir, "results_low_dt_fastpath.svg")
     PlotUtils.plot_line(
         "Fast-Path Hit Rate vs. Timestep dt",
-        "Timestep dt (from 1/120 s down to 1/12000 s)",
+        "Timestep dt (from 1/1 s down to 1/1200 s)",
         "Fast-Path Hit Rate (%)",
         freq_multipliers,
         low_dt_fastpath,
         colors,
         out_low_dt_fp;
-        min_y_override=95.0,
-        max_y_override=100.5,
-        y_digits=1,
+        min_y_override=0.0,
+        max_y_override=100.0,
+        y_digits=0,
         even_x_spacing=true,
         x_labels=dt_labels
     )
@@ -842,14 +842,14 @@ function run_all_benchmarks()
     out_low_dt_acc = joinpath(dir, "results_low_dt_accuracy.svg")
     PlotUtils.plot_line(
         "Approximation Error (RMSE) vs. Timestep dt",
-        "Timestep dt (from 1/120 s down to 1/12000 s)",
+        "Timestep dt (from 1/1 s down to 1/1200 s)",
         "RMSE vs. Exact Reference (px)",
         freq_multipliers,
         low_dt_accuracy,
         colors,
         out_low_dt_acc;
         min_y_override=0.0,
-        max_y_override=0.00010,
+        max_y_override=0.00080,
         y_digits=5,
         even_x_spacing=true,
         x_labels=dt_labels

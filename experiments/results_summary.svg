@@ -4,26 +4,26 @@
   <line x1="90" y1="440.0" x2="720" y2="440.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
   <text x="78" y="444.0" text-anchor="end" font-size="12" fill="#616161">0</text>
   <line x1="90" y1="366.0" x2="720" y2="366.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="370.0" text-anchor="end" font-size="12" fill="#616161">85</text>
+  <text x="78" y="370.0" text-anchor="end" font-size="12" fill="#616161">103</text>
   <line x1="90" y1="292.0" x2="720" y2="292.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="296.0" text-anchor="end" font-size="12" fill="#616161">169</text>
-  <line x1="90" y1="217.99999999999997" x2="720" y2="217.99999999999997" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="221.99999999999997" text-anchor="end" font-size="12" fill="#616161">254</text>
+  <text x="78" y="296.0" text-anchor="end" font-size="12" fill="#616161">206</text>
+  <line x1="90" y1="218.00000000000006" x2="720" y2="218.00000000000006" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="222.00000000000006" text-anchor="end" font-size="12" fill="#616161">308</text>
   <line x1="90" y1="144.0" x2="720" y2="144.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="148.0" text-anchor="end" font-size="12" fill="#616161">338</text>
-  <line x1="90" y1="69.99999999999994" x2="720" y2="69.99999999999994" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
-  <text x="78" y="73.99999999999994" text-anchor="end" font-size="12" fill="#616161">423</text>
+  <text x="78" y="148.0" text-anchor="end" font-size="12" fill="#616161">411</text>
+  <line x1="90" y1="70.0" x2="720" y2="70.0" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="78" y="74.0" text-anchor="end" font-size="12" fill="#616161">514</text>
   <text x="405.0" y="464" text-anchor="middle" font-size="13" font-weight="600" fill="#424242">Standard 16 Balls</text>
-  <rect x="335.0" y="329.5" width="26.0" height="110.5" rx="3" fill="#2E7D32"/>
-  <text x="348.0" y="324.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">126</text>
-  <rect x="363.0" y="302.9" width="26.0" height="137.1" rx="3" fill="#1976D2"/>
-  <text x="376.0" y="297.9" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">157</text>
-  <rect x="391.0" y="300.5" width="26.0" height="139.5" rx="3" fill="#00897B"/>
-  <text x="404.0" y="295.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">159</text>
-  <rect x="419.0" y="299.8" width="26.0" height="140.2" rx="3" fill="#E65100"/>
-  <text x="432.0" y="294.8" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">160</text>
+  <rect x="335.0" y="325.7" width="26.0" height="114.3" rx="3" fill="#2E7D32"/>
+  <text x="348.0" y="320.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">159</text>
+  <rect x="363.0" y="275.5" width="26.0" height="164.5" rx="3" fill="#1976D2"/>
+  <text x="376.0" y="270.5" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">229</text>
+  <rect x="391.0" y="305.9" width="26.0" height="134.1" rx="3" fill="#00897B"/>
+  <text x="404.0" y="300.9" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">186</text>
+  <rect x="419.0" y="290.7" width="26.0" height="149.3" rx="3" fill="#E65100"/>
+  <text x="432.0" y="285.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">207</text>
   <rect x="447.0" y="131.7" width="26.0" height="308.3" rx="3" fill="#C2185B"/>
-  <text x="460.0" y="126.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">352</text>
+  <text x="460.0" y="126.7" text-anchor="middle" font-size="10" font-weight="bold" fill="#424242">428</text>
   <line x1="90" y1="70" x2="90" y2="440" stroke="#424242" stroke-width="1.5"/>
   <line x1="90" y1="440" x2="720" y2="440" stroke="#424242" stroke-width="1.5"/>
   <text transform="rotate(-90)" x="-255.0" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#212121">Latency (ns / update)</text>
