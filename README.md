@@ -72,35 +72,86 @@ julia -O3 -g0 main.jl
 
 ## Experiments and Results
 
-Run `julia experiments/benchmark.jl` to regenerate the benchmark SVGs, or `julia experiments/tracked_point_trajectories.jl` to regenerate the tracking data and its separate solution plots. The benchmark advances a deterministic 16-ball scene, clears each DE solver's continuation history before each run, and performs the game's pre-physics and post-physics aim updates. It includes ball integration, wall reflections, and pair collisions; SDL rendering and event processing are excluded. Results are therefore simulated-update timings, not full-game FPS.
+Run `julia -O3 -g0 experiments/benchmark.jl` to regenerate the benchmark SVGs, or `julia -O3 -g0 experiments/tracked_point_trajectories.jl` to regenerate the tracking data and its separate solution plots. All solver hot loops and physics updates are annotated with `@inline` and `@fastmath` and executed with compiler optimizations `-O3 -g0` over `REPETITIONS = 10,000,000` simulated updates. The benchmark advances a deterministic 16-ball scene, clears each DE solver's continuation history before each run, and performs the game's physics and aim updates (ball integration, wall reflections, and pair collisions; SDL rendering and event processing are excluded). Results are therefore simulated-update timings, not full-game FPS.
 
-### Benchmark Results
+### Benchmark Results (`julia -O3 -g0`, 10,000,000 Runs)
 
-The benchmark confirms that Simple is typically a very cheap baseline method for this small two-dimensional line-circle problem, as its ray checks use direct geometric calculations. The DE methods add predictor-corrector logic, while Homotopy tracks polynomial roots through a continuation path.
-
-Across multiple benchmark runs, it can sometimes be the case that the DE methods are faster than the simple solution (particularly when temporal fast paths succeed and bypass checking other balls), but it is **never** the case that Homotopy is faster:
+To capture both average throughput and frame-time stability (tail latency and jitter), the benchmark measures **Mean**, **Median**, **Standard Deviation (`Std Dev`)**, **Best 10%** (mean of the 10% fastest updates, corresponding to unobstructed or fast-path frames), and **Worst 10%** (mean of the 10% slowest updates, corresponding to multi-ball collisions and central-loop continuation frames):
 
 ```text
------------------------------------------------------------------
-SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):
------------------------------------------------------------------
-| Solution         | Update (ns) | Relative latency |
-|:-----------------|------------:|-----------------:|
-| Simple           |       159.1 |             1.00x |
-| DE (Constant)    |       180.9 |             1.14x |
-| DE (Euler)       |       188.9 |             1.19x |
-| DE (RK4)         |       208.2 |             1.31x |
-| Homotopy         |       401.8 |             2.52x |
------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------
+SIMULATED UPDATE LATENCY DISTRIBUTION (16-Ball Scene, 10M Runs; rendering excluded):
+------------------------------------------------------------------------------------------------------
+| Solution         | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10% (ns) | Worst 10% (ns) | Relative |
+|:-----------------|----------:|------------:|-------------:|--------------:|---------------:|---------:|
+| Simple           |     146.6 |       150.2 |         37.5 |         120.7 |          177.4 |    1.00x |
+| DE (Constant)    |     176.9 |       168.2 |         41.2 |         150.7 |          222.5 |    1.21x |
+| DE (Euler)       |     183.3 |       172.8 |         38.4 |         156.2 |          231.8 |    1.25x |
+| DE (RK4)         |     192.0 |       195.5 |         48.4 |         156.9 |          255.5 |    1.31x |
+| Homotopy         |     391.1 |       216.4 |        333.1 |         170.6 |         1205.9 |    2.67x |
+------------------------------------------------------------------------------------------------------
 ```
 
-These figures vary by machine and runtime (measured over `REPETITIONS = 1,000,000` simulated updates per configuration); the plots below show the full scaling and scenario measurements.
+#### Ball Count Scaling ($N = 4, 8, 16, 32, 64$ — 10,000,000 Runs)
+
+| Balls ($N$) | Method | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10% (ns) | Worst 10% (ns) |
+| ---: | :--- | ---: | ---: | ---: | ---: | ---: |
+| **4** | `Simple` | 39.8 | 42.9 | 11.5 | 31.4 | 50.9 |
+| **4** | `DE (Constant)` | 48.6 | 51.5 | 13.8 | 36.4 | 62.4 |
+| **4** | `DE (Euler)` | 49.2 | 52.0 | 14.0 | 36.7 | 63.5 |
+| **4** | `DE (RK4)` | 51.6 | 53.8 | 15.0 | 38.0 | 71.0 |
+| **4** | `Homotopy` | 94.1 | 79.6 | 90.2 | 56.5 | 303.8 |
+| **8** | `Simple` | 66.2 | 64.1 | 17.4 | 48.4 | 88.2 |
+| **8** | `DE (Constant)` | 82.4 | 76.8 | 29.2 | 62.4 | 109.5 |
+| **8** | `DE (Euler)` | 84.0 | 76.5 | 33.1 | 57.8 | 122.1 |
+| **8** | `DE (RK4)` | 90.3 | 81.0 | 39.5 | 62.9 | 133.6 |
+| **8** | `Homotopy` | 190.4 | 118.2 | 200.4 | 88.0 | 664.7 |
+| **16** | `Simple` | 152.6 | 154.8 | 30.8 | 122.1 | 188.3 |
+| **16** | `DE (Constant)` | 180.9 | 171.7 | 48.2 | 145.8 | 241.2 |
+| **16** | `DE (Euler)` | 185.6 | 174.4 | 53.1 | 149.9 | 247.1 |
+| **16** | `DE (RK4)` | 196.0 | 197.8 | 99.9 | 152.4 | 278.8 |
+| **16** | `Homotopy` | 407.6 | 221.0 | 350.2 | 177.6 | 1255.3 |
+| **32** | `Simple` | 455.3 | 438.9 | 91.5 | 392.6 | 584.6 |
+| **32** | `DE (Constant)` | 532.4 | 513.2 | 125.9 | 458.0 | 688.2 |
+| **32** | `DE (Euler)` | 518.8 | 500.9 | 127.4 | 454.7 | 644.5 |
+| **32** | `DE (RK4)` | 528.3 | 525.7 | 80.8 | 454.6 | 660.2 |
+| **32** | `Homotopy` | 941.0 | 897.0 | 531.1 | 501.3 | 2145.1 |
+| **64** | `Simple` | 1684.0 | 1649.1 | 221.3 | 1574.6 | 2110.0 |
+| **64** | `DE (Constant)` | 1800.1 | 1759.0 | 247.2 | 1675.7 | 2217.5 |
+| **64** | `DE (Euler)` | 1808.8 | 1772.0 | 187.7 | 1689.4 | 2177.9 |
+| **64** | `DE (RK4)` | 1818.5 | 1778.1 | 215.9 | 1680.2 | 2246.5 |
+| **64** | `Homotopy` | 2626.6 | 2344.2 | 774.7 | 1792.2 | 4282.1 |
+
+#### Operational Scenarios (10,000,000 Runs)
+
+| Scenario | Method | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10% (ns) | Worst 10% (ns) |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
+| **Clear LOS** | `Simple` | 152.3 | 154.0 | 100.9 | 119.3 | 201.6 |
+| **Clear LOS** | `DE (Constant)` | 179.4 | 170.6 | 35.8 | 152.9 | 224.1 |
+| **Clear LOS** | `DE (Euler)` | 185.5 | 172.0 | 71.7 | 153.9 | 251.2 |
+| **Clear LOS** | `DE (RK4)` | 196.8 | 198.7 | 44.8 | 160.8 | 266.2 |
+| **Clear LOS** | `Homotopy` | 409.7 | 221.1 | 345.3 | 185.1 | 1250.6 |
+| **Blocked LOS** | `Simple` | 152.2 | 153.8 | 28.0 | 124.1 | 183.6 |
+| **Blocked LOS** | `DE (Constant)` | 178.7 | 169.7 | 36.6 | 153.0 | 222.9 |
+| **Blocked LOS** | `DE (Euler)` | 188.2 | 175.7 | 67.4 | 154.8 | 253.4 |
+| **Blocked LOS** | `DE (RK4)` | 190.4 | 190.3 | 46.0 | 156.1 | 254.9 |
+| **Blocked LOS** | `Homotopy` | 404.2 | 221.4 | 342.3 | 177.6 | 1236.9 |
+| **Dense (32 Balls)** | `Simple` | 457.5 | 440.3 | 116.3 | 393.9 | 587.6 |
+| **Dense (32 Balls)** | `DE (Constant)` | 518.4 | 499.1 | 121.8 | 448.1 | 673.9 |
+| **Dense (32 Balls)** | `DE (Euler)` | 523.6 | 503.5 | 138.8 | 451.5 | 680.4 |
+| **Dense (32 Balls)** | `DE (RK4)` | 529.6 | 529.3 | 95.1 | 455.9 | 656.8 |
+| **Dense (32 Balls)** | `Homotopy` | 935.5 | 892.0 | 532.4 | 499.2 | 2137.9 |
+| **Moving LOS** | `Simple` | 153.1 | 154.7 | 34.4 | 122.8 | 189.6 |
+| **Moving LOS** | `DE (Constant)` | 180.6 | 170.6 | 43.8 | 152.5 | 229.6 |
+| **Moving LOS** | `DE (Euler)` | 182.6 | 171.3 | 45.3 | 153.8 | 234.0 |
+| **Moving LOS** | `DE (RK4)` | 195.4 | 199.8 | 48.7 | 161.9 | 256.7 |
+| **Moving LOS** | `Homotopy` | 401.1 | 218.9 | 334.4 | 185.8 | 1220.8 |
 
 ![Update latency as the number of balls increases](experiments/results_ball_scaling.svg)
 
 ![Update latency across clear, blocked, dense, and moving-line-of-sight scenes](experiments/results_scenarios.svg)
 
-![Summary update latency for the 16-ball scene](experiments/results_summary.svg)
+![Summary update latency distribution for the 16-ball scene](experiments/results_summary.svg)
 
 ![Fast-path hit rate across operational scenarios](experiments/results_fastpath.svg)
 
@@ -126,17 +177,29 @@ Each plot shows one method against the Simple reference. The x and y coordinates
 
 Simple is expected to do well here: it evaluates inexpensive closed-form line-circle intersections in only two dimensions. Higher-order predictors and continuation methods cannot remove the work of considering the candidate balls, and they add their own numerical work. In higher dimensions, with more complicated geometric constraints, or with polynomial systems that lack a cheap direct solution, methods such as predictor-corrector continuation or Homotopy can become more useful and may outperform a direct approach. That depends on the problem and should be measured rather than assumed.
 
-### Why Each Method Is Faster or Slower: Algorithmic & Hardware Breakdown
+### Why Each Method Is Faster or Slower: Algorithmic, Statistical & Hardware Breakdown
 
-The observed latency ranking—**`Simple` (`~159 ns`) < `DE (Constant)` (`~181 ns`) < `DE (Euler)` (`~189 ns`) < `DE (RK4)` (`~208 ns`) $\ll$ `Homotopy` (`~402 ns`)**—is a direct consequence of the trade-off between **per-step arithmetic cost** (Jacobian linear solves vs. hardware `sqrt`) and **fast-path / continuation convergence rates**:
+With `@inline`, `@fastmath`, and `-O3 -g0` enabled across 10,000,000 runs, the latency hierarchy follows the exact arithmetic cost of each method (`146.6 ns` for `Simple`, `176.9 ns` for `DE (Constant)`, `183.3 ns` for `DE (Euler)`, `192.0 ns` for `DE (RK4)`, and `391.1 ns` for `Homotopy`), while the three DE solvers remain tightly clustered within **`1.21x–1.31x`** of `Simple` (`~15 ns` spread between `Constant`, `Euler`, and `RK4`). This tight clustering is a direct consequence of the trade-off between **register-inlined FMA arithmetic** and **fast-path / continuation convergence rates**:
 
-| Method | Fast-Path Predictor Cost | Fast-Path Corrector Cost | $2\times 2$ Linear Solves / Fast-Path | Fast-Path Hit Rate (`Moving LOS`) | Central Loop Continuation Calls | Why It Ranks Here |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| **`Simple`** | None (stateless) | Exact `sqrt(R² - d_⊥²)` | **0** | N/A | 0 (direct `sqrt`) | 1 hardware `sqrt` (~3–4 CPU cycles) in `Float32` is cheaper than any $2\times 2$ Jacobian solve |
-| **`DE (Constant)`** | 2 additions (`x + Δx`) | 1× `newton_step` | **1** | 88.67% | 53,778 | Zero-cost predictor + single Newton step; fastest DE variant, but lowest continuation convergence |
-| **`DE (Euler)`** | 1× `euler_step` (`dx_dt`) | 1× `newton_step` | **2** | 93.30% | 39,511 | 1 extra `solve_2x2` in predictor is nearly offset by 27% fewer central-loop continuation calls |
-| **`DE (RK4)`** | 4-stage `rk4_step` | 1× `newton_step` | **5** | 98.59% | 23,200 | 5× the linear solves of `Constant`, partially amortized by 98.6% fast-path & 97.8% loop convergence |
-| **`Homotopy`** | None (stateless) | Adaptive RK4+Newton on 2 roots | **~42 / ball** | 0% (no fast path) | Every candidate ball | Tracks both roots (`r_entry`, `r_exit`) via adaptive RK4 + Newton sub-steps on every frame |
+| Method | Fast-Path Predictor Cost | Fast-Path Corrector Cost | $2\times 2$ Linear Solves / Fast-Path | Fast-Path Hit Rate (`Moving LOS`) | Central Loop Continuation Calls (10M) | Std Dev (`Summary`) | Worst 10% (`Summary`) |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **`Simple`** | None (stateless) | Exact `sqrt(R² - d_⊥²)` | **0** | N/A | 0 (direct `sqrt`) | 37.5 ns | 177.4 ns |
+| **`DE (Constant)`** | 2 additions (`x + Δx`) | 1× `newton_step` | **1** | 88.79% | 546,582 | 41.2 ns | 222.5 ns |
+| **`DE (Euler)`** | 1× `euler_step` (`dx_dt`) | 1× `newton_step` | **2** | 93.36% | 406,356 | 38.4 ns | 231.8 ns |
+| **`DE (RK4)`** | 4-stage `rk4_step` | 1× `newton_step` | **5** | 98.60% | 245,490 | 48.4 ns | 255.5 ns |
+| **`Homotopy`** | None (stateless) | Adaptive RK4+Newton on 2 roots | **~42 / ball** | 0% (no fast path) | Every candidate ball | **333.1 ns** | **1205.9 ns** |
+
+#### Statistical Distribution Analysis: Mean vs. Median, Std Dev & Tail Latency (Best 10% vs. Worst 10%)
+
+1. **Why `Homotopy` Has a Low Median (`216.4 ns`) but Huge Mean (`391.1 ns`), Std Dev (`333.1 ns`), and Worst 10% (`1205.9 ns`)**:
+   - In the 16-ball scene, **71.8%** of frames have an unobstructed line of sight (`d_perp_sq >= R²` for all balls). On those unobstructed frames, `Homotopy` performs only the broad-phase dot-product checks, yielding a **Best 10% of `170.6 ns`** and a **Median of `216.4 ns`**—very close to the DE solvers.
+   - However, on the **28.2%** of frames where one or more balls block the sightline, `Homotopy` has no temporal fast path (`0%`) and tracks *both* polynomial roots (`r_entry` and `r_exit`) through ~4 adaptive RK4 + Newton steps (~42 linear $2\times 2$ solves per blocking ball). Consequently, its **Worst 10% spikes to `1205.9 ns`**—**5.6× slower than its Median**—creating a heavily right-skewed distribution with **8× higher standard deviation (`333.1 ns` vs. `38.4–48.4 ns`)**.
+2. **Why the DE Methods Maintain Low Standard Deviation (`38.4–48.4 ns`) and Tight Worst 10% (`222.5–255.5 ns`)**:
+   - Because the temporal fast path resolves **88.79% (`Constant`)**, **93.36% (`Euler`)**, and **98.60% (`RK4`)** of blocked frames in a single predictor-corrector step *before* the central loop and narrows `t_min` immediately, blocked frames cost nearly the same as unobstructed frames.
+   - As a result, all three DE methods have compact, near-symmetric distributions where **Mean ≈ Median** (`168.2–195.5 ns`) and their **Worst 10% (`222.5–255.5 ns`)** is **4.7× to 5.4× faster** than `Homotopy`'s Worst 10% (`1205.9 ns`), avoiding frame-time spikes when balls cross the cue ray.
+3. **Why `-O3 -g0` + `@inline @fastmath` Keeps `DE (Constant)`, `DE (Euler)`, and `DE (RK4)` Within `~15 ns` (`176.9 ns`, `183.3 ns`, `192.0 ns`)**:
+   - With `@inline @fastmath` under `-O3 -g0`, LLVM keeps all 2-tuples (`x`, `p`, `n`, `c`, `J`) in scalar AVX registers and fuses `solve_2x2` into hardware FMA instructions. Each additional predictor order adds only **`~6.4 ns`** (`Constant` $\to$ `Euler`) and **`~8.7 ns`** (`Euler` $\to$ `RK4`) on average.
+   - Much of the extra arithmetic in `euler_step` (1 extra `solve_2x2`) and `rk4_step` (4 extra `solve_2x2` stages) is amortized by their higher fast-path hit rates (`93.36%` and `98.60%` vs. `88.79%`), which cut central-loop continuation calls by **26%** (`546,582 → 406,356` in `Euler`) and **55%** (`546,582 → 245,490` in `RK4`, with **19× fewer `sqrt` fallbacks**: `26,774` vs. `517,986`).
 
 #### Function Call Breakdown: With Fast-Path vs. Without Fast-Path (Central Loop)
 
@@ -145,53 +208,24 @@ To see concretely why each method has a different computational cost, below is t
 | Method | Path A: Temporal Fast-Path (`prev_ball_id != 0`, before loop) | Path B: Central Loop (`for j in 1:num_balls`, when `d_perp_sq < R²`) |
 | :--- | :--- | :--- |
 | **`Simple`**<br>(`SimpleSolution.jl`) | *(No fast path — stateless across frames)* | 1. Inline `sqrt(rad_sq - d_perp_sq)` *(1× hardware `sqrtss`)*<br>2. Inline ray point `qx + t_hit * ux`<br>**Total: 0 function calls, 0 `solve_2x2`, 1 `sqrt`** |
-| **`DE (Constant)`**<br>(`DEConstantSolution.jl` $\to$ `DESolution.jl`) | 1. Inline predictor: `x_pred = prev_sol .+ PREV_DELTA`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 2× `f_error`, 1× `jacobian`, 1× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:zero_order`):<br>&nbsp;&nbsp;• `newton_step(r_entry, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (~89.4% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 1× `jacobian`, 1× `solve_2x2` (+ 1× `sqrt` on fallback)** |
-| **`DE (Euler)`**<br>(`DEEulerSolution.jl` $\to$ `DESolution.jl`) | 1. `euler_step(prev_sol, p, dp_dt, n_prev, dn_dt, c_prev, dc_dt, dt)`:<br>&nbsp;&nbsp;• `dx_dt`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 1× `df_dt`, 2× `f_error`, 2× `jacobian`, 2× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:euler`):<br>&nbsp;&nbsp;• `jacobian(x_curr, n, c_mid)` $\to$ `solve_2x2(J, f_s)` *(midpoint Euler predictor)*<br>&nbsp;&nbsp;• `newton_step(x_pred, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (~55.0% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 2× `jacobian`, 2× `solve_2x2` (+ 1× `sqrt` on fallback)** |
-| **`DE (RK4)`**<br>(`DERK4Solution.jl` $\to$ `DESolution.jl`) | 1. `rk4_step(prev_sol, p, dp_dt, n_prev, dn_dt, c_prev, dc_dt, dt)`:<br>&nbsp;&nbsp;• `k1 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k2 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k3 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k4 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 4× `df_dt`, 2× `f_error`, 5× `jacobian`, 5× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:rk4`):<br>&nbsp;&nbsp;• `J1 = jacobian` $\to$ `solve_2x2(J1, f_s1)` (`k1`)<br>&nbsp;&nbsp;• `J2 = jacobian` $\to$ `solve_2x2(J2, f_s2)` (`k2`)<br>&nbsp;&nbsp;• `J3 = jacobian` $\to$ `solve_2x2(J3, f_s3)` (`k3`)<br>&nbsp;&nbsp;• `J4 = jacobian` $\to$ `solve_2x2(J4, f_s4)` (`k4`)<br>&nbsp;&nbsp;• `newton_step(x_pred, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (only ~2.2% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 5× `jacobian`, 5× `solve_2x2` (almost never needs `sqrt`)** |
+| **`DE (Constant)`**<br>(`DEConstantSolution.jl` $\to$ `DESolution.jl`) | 1. Inline predictor: `x_pred = prev_sol .+ PREV_DELTA`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 2× `f_error`, 1× `jacobian`, 1× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:zero_order`):<br>&nbsp;&nbsp;• `newton_step(r_entry, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (~94.8% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 1× `jacobian`, 1× `solve_2x2` (+ 1× `sqrt` on fallback)** |
+| **`DE (Euler)`**<br>(`DEEulerSolution.jl` $\to$ `DESolution.jl`) | 1. `euler_step(prev_sol, p, dp_dt, n_prev, dn_dt, c_prev, dc_dt, dt)`:<br>&nbsp;&nbsp;• `dx_dt`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 1× `df_dt`, 2× `f_error`, 2× `jacobian`, 2× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:euler`):<br>&nbsp;&nbsp;• `jacobian(x_curr, n, c_mid)` $\to$ `solve_2x2(J, f_s)` *(midpoint Euler predictor)*<br>&nbsp;&nbsp;• `newton_step(x_pred, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (~73.4% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 2× `jacobian`, 2× `solve_2x2` (+ 1× `sqrt` on fallback)** |
+| **`DE (RK4)`**<br>(`DERK4Solution.jl` $\to$ `DESolution.jl`) | 1. `rk4_step(prev_sol, p, dp_dt, n_prev, dn_dt, c_prev, dc_dt, dt)`:<br>&nbsp;&nbsp;• `k1 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k2 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k3 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>&nbsp;&nbsp;• `k4 = dx_dt(...)`: `jacobian` $\to$ `df_dt` $\to$ `solve_2x2`<br>2. `newton_step(x_pred, p, n, c_now, rad)` *(1 iter)*:<br>&nbsp;&nbsp;• `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>3. `f_error(x_corr, ...)` *(convergence check)*<br>4. Central loop skips `j == best_hit_id`<br>**Total: 4× `df_dt`, 2× `f_error`, 5× `jacobian`, 5× `solve_2x2`** | 1. `track_continuation(r_entry, ..., c_now, rad)` (`:rk4`):<br>&nbsp;&nbsp;• `J1 = jacobian` $\to$ `solve_2x2(J1, f_s1)` (`k1`)<br>&nbsp;&nbsp;• `J2 = jacobian` $\to$ `solve_2x2(J2, f_s2)` (`k2`)<br>&nbsp;&nbsp;• `J3 = jacobian` $\to$ `solve_2x2(J3, f_s3)` (`k3`)<br>&nbsp;&nbsp;• `J4 = jacobian` $\to$ `solve_2x2(J4, f_s4)` (`k4`)<br>&nbsp;&nbsp;• `newton_step(x_pred, p, n, c_next, rad)` *(1 iter)*:<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ `f_error` $\to$ `jacobian` $\to$ `solve_2x2`<br>2. `f_error(sol1, ...)` *(residual check `< 1e-4`)*<br>3. If `!found_hit` (only ~10.9% of loop calls):<br>&nbsp;&nbsp;• Fallback `sqrt(max(0.0, rad_sq - d_perp_sq))`<br>**Total: 2× `f_error`, 5× `jacobian`, 5× `solve_2x2` (rarely needs `sqrt`)** |
 | **`Homotopy`**<br>(`HomotopySolution.jl`) | *(No fast path — stateless across frames)* | For **both** `r_entry` and `r_exit` (2× calls to `track_fast`):<br>1. Adaptive loop `while t < 1.0` (~4 sub-steps: $\Delta t = 0.1, 0.2, 0.4, 0.3$):<br>&nbsp;&nbsp;• `rk4_step_fast`: 4 stages $\times$ (`Hx_fast` $\to$ `dh1dx_fast` + `dh2dx_fast`, `Ht_fast` $\to$ `fn_fast`, `solve_2x2_fast`)<br>&nbsp;&nbsp;• `newton_step_fast` (1–2 iters): `Hx_fast`, `H_fast` $\to$ `fn_fast`, `solve_2x2_fast`<br>2. Final polishing `newton_step_fast(curr, 1.0, pi, pf)`<br>3. `fn_fast(sol, pf)` on both `(sol1, sol2)`<br>**Total (for 2 roots): ~42× `Hx_fast`, ~44× `fn_fast`, ~42× `solve_2x2_fast`** |
 
 **Key Takeaway from Comparing Path A vs. Path B:**
 - When a DE method takes **Path A (Fast-Path)**, it resolves the active blocker **before** the loop and immediately shrinks `t_min` to that blocker's distance. Inside the central loop (`for j in 1:num_balls`), it skips `j == best_hit_id` (`tracked_fast && j == best_hit_id && continue`) and uses the tighter `t_min` to prune any balls behind the blocker via the cheap axial check (`t_proj >= t_min + rad`), avoiding `track_continuation` (Path B) entirely unless a *new* closer ball enters the ray.
-- When **Path A fails** (or on the first frame of a new blocker), execution falls through to **Path B** in the central loop, paying both the failed Path A cost *and* the Path B `track_continuation` cost (plus the fallback `sqrt` when `track_continuation` does not converge). This explains why `DE (Euler)` and `DE (RK4)`—which fail Path A `2.3×` and `6.6×` less often than `DE (Constant)`—remain competitive in total runtime despite executing more `solve_2x2` calls per step.
+- When **Path A fails** (or on the first frame of a new blocker), execution falls through to **Path B** in the central loop, paying both the failed Path A cost *and* the Path B `track_continuation` cost (plus the fallback `sqrt` when `track_continuation` does not converge). This explains why `DE (Euler)` and `DE (RK4)`—which fail Path A `1.7×` and `8.0×` less often than `DE (Constant)`—stay within just `~6–15 ns` of `DE (Constant)` when compiled with `-O3 -g0` and `@inline @fastmath`.
 
-#### 1. Why `Simple` (`1.00x`, ~159 ns) Is the Fastest Baseline in 2D
-- **Minimal instruction count per candidate ball**: Once a ball passes the cheap axial (`t_proj <= 0 || t_proj >= t_min`) and perpendicular (`d_perp_sq >= R²`) dot-product filters, computing the exact entry intersection requires only **one hardware `sqrt`** (`h = sqrt(R² - d_perp_sq)`) and two fused multiply-adds (`hit = p + (t_proj - h) * u`) in `Float32`.
-- **Zero state or matrix overhead**: It performs no `Float32 → Float64` conversions, evaluates no nonlinear residual vectors (`f_error`), constructs no Jacobian matrices, and executes zero floating-point divisions inside the candidate loop. On modern x86_64 CPUs, a scalar `sqrtss` instruction has a latency of ~3–4 cycles—less than a single $2\times 2$ Cramer's rule division (`1.0 / detJ`) in `solve_2x2`.
-
-#### 2. Why `DE (Constant)` (`1.14x`, ~181 ns) Is the Fastest DE Method
-- **Why it beats `Euler` and `RK4`**: Its temporal predictor (`x_pred = prev_sol + PREV_DELTA`) uses only **2 floating-point additions** (extrapolating the previous frame's displacement without evaluating the Davidenko ODE or velocity derivatives), followed by **strictly one Newton-Raphson iteration** (`newton_step`). This requires only **1 linear solve (`solve_2x2`)** per fast-path frame.
-- **Why it is still ~14% slower than `Simple` on average**:
-  1. **The $O(N)$ broad-phase loop cannot be skipped**: Even when `tracked_fast == true` succeeds on `prev_ball_id` (which happens on **88.7%–96.3%** of blocked frames), the solver **must still iterate over all other $N - 2$ balls** in the central loop to verify that no other ball has moved closer than `t_min`. Thus, the fast path narrows `t_min` early and skips `prev_ball_id`, but still pays the loop traversal cost.
-  2. **Fast-path overhead vs. `sqrt`**: Computing `x_pred`, running 1 `Float64` `newton_step`, and re-evaluating `f_error(x_corr)` + `newton_move_sq` to validate convergence takes ~18 FLOPs and 1 division—slightly more work than `Simple` does to solve the intersection analytically with a single `sqrt`.
-  3. **Low spatial continuation convergence in the central loop**: When the fast path misses (e.g., on the first frame a new blocker enters the ray) and `track_continuation` is called in `:zero_order` mode, starting from `r_entry` at $s = 0$ with a single constant-predictor Newton step only converges within $\|f(x)\|^2 < 10^{-4}$ for small perpendicular offsets ($d_\perp < 1.9\text{ px}$, or **10.6%** of $[0, R)$). On the remaining **95.0%** of central-loop continuation calls (`51,103 / 53,778` in `Moving LOS`), it fails the residual check and falls back to the exact `sqrt`, paying for *both* the Newton step and the exact fallback.
-
-#### 3. Why `DE (Euler)` (`1.19x`, ~189 ns) Almost Ties `DE (Constant)`
-- **Higher per-frame predictor cost**: In the fast path, `DE (Euler)` computes the analytical velocity of the sightline normal (`dn_dt`) and blocker center (`dc_dt`), evaluates `euler_step` (1 `solve_2x2` call), and then applies `newton_step` (a 2nd `solve_2x2` call)—**twice the linear-algebra work** of `DE (Constant)`.
-- **Amortization via higher accuracy**: Because first-order tangent integration along the Davidenko ODE (`dx/dt = -J⁻¹ ∂f/∂t`) predicts the intersection movement along the circle much more accurately than constant displacement extrapolation:
-  - Its fast-path hit rate in `Moving LOS` jumps from **88.67% → 93.30%**, reducing central-loop `track_continuation` calls by **27%** (`53,778 → 39,511`).
-  - Inside `track_continuation`, using the midpoint secant derivative $\partial H_2/\partial s = -2(x - c_{\text{mid}})\cdot \Delta c$ raises single-step spatial convergence from **10.6% → 45.0%**, cutting exact fallbacks by **43%** (`51,103 → 29,088`).
-  - As a result, the time saved by avoiding failed predictions almost completely pays for the extra `solve_2x2` in `euler_step` (and in dense 32–64 ball scenes, `DE (Euler)` stays within ~1.5%–3% of `DE (Constant)`).
-
-#### 4. Why `DE (RK4)` (`1.31x`, ~208 ns) Is Slower Than `Constant` and `Euler`, Yet Still Competitive
-- **5× linear solves per step**: Every `rk4_step` in the fast path (and every `:rk4` call in `track_continuation`) evaluates **4 Runge-Kutta stages (`k1, k2, k3, k4`) + 1 `newton_step` = 5 `solve_2x2` inversions** (5 divisions and ~80 FLOPs).
-- **Why it is only ~15% slower than `DE (Constant)` (instead of 5× slower)**:
-  1. **Fast-path amortization**: In `Moving LOS` (`16` balls), ~71.6% of frames have an unobstructed sightline where no fast-path or continuation is triggered at all, and on the 28.4% of blocked frames, `RK4` achieves a **98.59%** fast-path hit rate—meaning `track_continuation` is only invoked `23,200` times across `1,000,000` frames (`0.023` calls per frame).
-  2. **Near-100% single-step continuation convergence**: When `track_continuation` *is* called, 4th-order integration tracks the circular arc across $s \in [0, 1]$ with **97.8%** single-step convergence across $[0, R)$, requiring the exact fallback only `2,718` times in `1,000,000` frames (19× fewer fallbacks than `Constant`).
-
-#### 5. Why `Homotopy` (`2.52x`, ~402 ns) Is Always the Slowest Method
-- **Stateless across frames (0% fast path)**: Unlike `DESolution`, `HomotopySolution` does not track `PREV_TRACKED_BALL[]` between frames. Every single frame, it treats the scene as a brand-new polynomial system.
-- **Multi-step adaptive RK4 + Newton integration of *both* roots per candidate ball**: For every ball whose bounding circle intersects the ray (`d_perp_sq < R²`), `HomotopySolution` initializes a start system centered on the ray (`r_entry` and `r_exit`) and calls `track_fast` on **both roots** across an adaptive continuation loop (`while t < 1.0`, ~4 sub-steps: $\Delta t = 0.1, 0.2, 0.4, 0.3$), performing a 4-stage `rk4_step_fast` + 1–2 `newton_step_fast` corrector iterations at *each* sub-step plus a final polishing `newton_step_fast` (~42 linear $2\times 2$ solves per candidate ball, vs. `Simple`'s single `sqrt`).
-- **When `DE` and `Homotopy` outperform direct solvers**: In 2D line-circle intersection, the polynomial system has degree 2 and a trivial closed-form root (`sqrt`). In higher-dimensional geometric modeling, robotics kinematics, or ray-tracing of higher-degree algebraic surfaces ($d \ge 5$) where no closed-form radical formula exists, computing roots from scratch requires expensive iterative eigenvalue or Gröbner-basis solvers at every frame. In those regimes, local predictor-corrector tracking (`DE`) and homotopy continuation (`Homotopy`) avoid global root-finding altogether and become orders of magnitude faster.
-
-### Detailed Experimental Investigations (1,000,000 Runs)
+### Detailed Experimental Investigations (10,000,000 Runs)
 
 #### 1. Central Loop Fast-Path Frequency (`tracked_fast`)
 In `DESolution.aim_cue!`, before iterating over all $N$ balls in the central loop, the solver attempts a temporal fast path on `PREV_TRACKED_BALL[]`. When `newton_move_sq < 0.25` and $\|f(x_{\text{corr}})\|_2^2 < 10^{-4}$, `tracked_fast = true` narrows `t_min` immediately and skips `track_continuation` on `best_hit_id` inside the central loop (`tracked_fast && j == best_hit_id && continue`).
 
-Across **1,000,000 simulated updates** in the `Moving LOS` / `Standard 16 Balls` benchmark (`283,951` frames with an active blocker, i.e., `28.4%` of all frames):
-- **`DE (Constant)`**: takes the fast path on **251,775 / 283,951** blocked frames (**88.67%** of eligible frames, **25.18%** of all frames), calling `track_continuation` `53,778` times in the central loop.
-- **`DE (Euler)`**: takes the fast path on **264,922 / 283,951** blocked frames (**93.30%** of eligible frames, **26.49%** of all frames), calling `track_continuation` `39,511` times.
-- **`DE (RK4)`**: takes the fast path on **279,947 / 283,954** blocked frames (**98.59%** of eligible frames, **27.99%** of all frames), calling `track_continuation` only `23,200` times (with an `88.3%` continuation convergence rate, needing the exact fallback only `2,718` times across `16,000,000` loop iterations).
+Across **10,000,000 simulated updates** in the `Moving LOS` / `Standard 16 Balls` benchmark (`2,821,456` frames with an active blocker, i.e., `28.2%` of all frames):
+- **`DE (Constant)`**: takes the fast path on **2,505,054 / 2,821,456** blocked frames (**88.79%** of eligible frames, **25.05%** of all frames), calling `track_continuation` `546,582` times in the central loop (`28,596` converged, `517,986` exact fallbacks).
+- **`DE (Euler)`**: takes the fast path on **2,634,112 / 2,821,456** blocked frames (**93.36%** of eligible frames, **26.34%** of all frames), calling `track_continuation` `406,356` times (`108,088` converged, `298,268` exact fallbacks).
+- **`DE (RK4)`**: takes the fast path on **2,782,037 / 2,821,458** blocked frames (**98.60%** of eligible frames, **27.82%** of all frames), calling `track_continuation` only `245,490` times (with an `89.1%` continuation convergence rate: `218,716` converged, needing the exact fallback only `26,774` times across `160,000,000` loop iterations).
 
 #### 2. Timestep Scaling Experiments ($\Delta t$ from $1/1\text{ s}$ down to $1/1200\text{ s}$)
 Decreasing $\Delta t$ from $1/1\text{ s}$ ($1.0\text{ s}$) down to $1/1200\text{ s}$ ($8.33 \times 10^{-4}\text{ s}$) reduces per-step ball displacement $\|v \Delta t\|$ and chord curvature error $O(\Delta t^2)$:

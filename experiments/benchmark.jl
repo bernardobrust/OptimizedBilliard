@@ -3,9 +3,9 @@
 # Measures simulated updates using the game's ball integration, wall reflection,
 # pair collisions, and aim solver (rendering and event handling excluded), and
 # runs numerical experiments on:
-#   1. Ball count scaling (N = 4, 8, 16, 32, 64) over 1,000,000 steps
-#   2. Operational scenarios (Clear, Blocked, Dense, Moving LOS) over 1,000,000 steps
-#   3. Standard 16-ball latency summary over 1,000,000 steps
+#   1. Ball count scaling (N = 4, 8, 16, 32, 64) over 10,000,000 steps
+#   2. Operational scenarios (Clear, Blocked, Dense, Moving LOS) over 10,000,000 steps
+#   3. Standard 16-ball latency summary over 10,000,000 steps
 #   4. Central loop fast-path hit rate & branch breakdown
 #   5. Timestep (`dt`) accuracy, fast-path, and latency scaling
 #   6. Constant predictor Newton iteration ablation (2 vs 1 vs 0 iterations)
@@ -30,8 +30,8 @@ using .PlotUtils
 using Printf
 using Random
 
-# Number of simulated physics + aiming updates per benchmark run (1,000,000 runs)
-const REPETITIONS = 1_000_000
+# Number of simulated physics + aiming updates per benchmark run (10,000,000 runs)
+const REPETITIONS = 10_000_000
 
 # Creates a deterministic `DataPlex` scene with `num_balls` balls for reproducible benchmarking
 function create_data(num_balls::Int32; blocked::Bool=true, dt_target::Float64=1.0/120.0)
@@ -83,18 +83,18 @@ function create_data(num_balls::Int32; blocked::Bool=true, dt_target::Float64=1.
 end
 
 # Resets all global continuation tracking state in `DESolution` before a fresh run
-function reset_de_state!()
+@inline @fastmath function reset_de_state!()
     DESolution.PREV_TRACKED_BALL[] = 0
     DESolution.PREV_DELTA_X[] = 0.0
     DESolution.PREV_DELTA_Y[] = 0.0
 end
 
 # Advances ball linear kinematics, specular wall reflections, and pairwise elastic collisions
-function advance_game_physics!(data)
+@inline @fastmath function advance_game_physics!(data)
     dt = Float32(data.dt_target)
     rad = data.ball_radius
     max_x, max_y = data.bound_x - rad, data.bound_y - rad
-    @inbounds for i in 1:data.num_balls
+    @inbounds @fastmath for i in 1:data.num_balls
         x = data.ball_x[i] + data.ball_vx[i] * dt
         y = data.ball_y[i] + data.ball_vy[i] * dt
         vx, vy = data.ball_vx[i], data.ball_vy[i]
@@ -114,7 +114,7 @@ function advance_game_physics!(data)
 
     min_dist = 2.0f0 * rad
     min_dist_sq = min_dist * min_dist
-    @inbounds for i in 1:(data.num_balls-1)
+    @inbounds @fastmath for i in 1:(data.num_balls-1)
         x1, y1 = data.ball_x[i], data.ball_y[i]
         vx1, vy1 = data.ball_vx[i], data.ball_vy[i]
         for j in (i+1):data.num_balls
@@ -142,33 +142,94 @@ function advance_game_physics!(data)
     end
 end
 
-# Measures average nanoseconds per simulated update (`advance_game_physics!` + `f!`) over `reps` steps
-function benchmark_func(f!, source_data, sid::Int32; reps::Int=REPETITIONS)
+# Measures full latency statistics (mean, median, std, best 10%, worst 10%) in nanoseconds
+# per simulated update (`advance_game_physics!` + `f!`) over `reps` steps.
+@inline @fastmath function benchmark_stats(f!::F, source_data, sid::Int32; reps::Int=REPETITIONS, batch_size::Int=10) where {F}
     data = deepcopy(source_data)
     DESolution.set_algorithmic_dt!(data.dt_target)
     initial_x, initial_y = copy(data.ball_x), copy(data.ball_y)
     initial_vx, initial_vy = copy(data.ball_vx), copy(data.ball_vy)
-    # Match the game's fixed-rate aiming update: advance physics, then aim once.
-    step!() = (advance_game_physics!(data); f!(data, sid))
-    reset!() = begin
+
+    @inline @fastmath step!() = (advance_game_physics!(data); f!(data, sid))
+    @inline reset!() = begin
         copyto!(data.ball_x, initial_x); copyto!(data.ball_y, initial_y)
         copyto!(data.ball_vx, initial_vx); copyto!(data.ball_vy, initial_vy)
         data.collision_x = 0.0f0; data.collision_y = 0.0f0
         reset_de_state!()
     end
-    # Warm-up pass for JIT compilation
+
+    # 1. Warm-up pass for JIT compilation
     reset!()
-    for _ in 1:200
+    @inbounds @fastmath for _ in 1:200
         step!()
     end
-    # Timed measurement pass
+
+    # 2. Un-instrumented tight timed pass for exact mean latency (zero timer overhead in loop)
     reset!()
     t0 = time_ns()
-    for _ in 1:reps
+    @inbounds @fastmath for _ in 1:reps
         step!()
     end
     t_total = time_ns() - t0
-    return t_total / reps
+    mean_ns = Float64(t_total) / reps
+
+    # 3. Micro-batch distribution pass for median, std dev, best 10%, and worst 10%
+    n_batches = max(10, div(reps, batch_size))
+    samples = Vector{Float64}(undef, n_batches)
+    inv_batch = 1.0 / Float64(batch_size)
+    reset!()
+    @inbounds @fastmath for b in 1:n_batches
+        tb0 = time_ns()
+        for _ in 1:batch_size
+            step!()
+        end
+        samples[b] = Float64(time_ns() - tb0) * inv_batch
+    end
+
+    # Calibrate out `time_ns()` vDSO overhead so sample mean matches un-instrumented `mean_ns`
+    raw_mean = 0.0
+    @inbounds @fastmath for b in 1:n_batches
+        raw_mean += samples[b]
+    end
+    raw_mean /= n_batches
+    scale = raw_mean > 0.0 ? (mean_ns / raw_mean) : 1.0
+    @inbounds @fastmath for b in 1:n_batches
+        samples[b] *= scale
+    end
+
+    sort!(samples)
+    mid = div(n_batches, 2)
+    median_ns = isodd(n_batches) ? samples[mid + 1] : 0.5 * (samples[mid] + samples[mid + 1])
+
+    sum_sq_diff = 0.0
+    @inbounds @fastmath for b in 1:n_batches
+        d = samples[b] - mean_ns
+        sum_sq_diff += d * d
+    end
+    std_ns = sqrt(sum_sq_diff / max(1, n_batches - 1))
+
+    k10 = max(1, div(n_batches, 10))
+    sum_best10 = 0.0
+    sum_worst10 = 0.0
+    @inbounds @fastmath for i in 1:k10
+        sum_best10 += samples[i]
+        sum_worst10 += samples[n_batches - k10 + i]
+    end
+    best10_ns = sum_best10 / k10
+    worst10_ns = sum_worst10 / k10
+
+    return (
+        mean = mean_ns,
+        median = median_ns,
+        std = std_ns,
+        best10 = best10_ns,
+        worst10 = worst10_ns
+    )
+end
+
+# Scalar wrapper returning mean latency in nanoseconds per simulated update
+@inline @fastmath function benchmark_func(f!::F, source_data, sid::Int32; reps::Int=REPETITIONS) where {F}
+    return benchmark_stats(f!, source_data, sid; reps=reps).mean
 end
 
 
@@ -176,7 +237,7 @@ end
 # Experiment 4 Helper: Instruments `DESolution.aim_cue!` to count exact branch
 # frequencies inside the temporal fast-path and central candidate loop.
 # =============================================================================
-function analyze_fastpath_and_loop(source_data, sid::Int32, mode::Symbol; reps::Int=REPETITIONS)
+@inline @fastmath function analyze_fastpath_and_loop(source_data, sid::Int32, mode::Symbol; reps::Int=REPETITIONS)
     data = deepcopy(source_data)
     reset_de_state!()
     DESolution.set_algorithmic_dt!(data.dt_target)
@@ -364,9 +425,9 @@ function make_trajectory_scene(dt_val::Float64)
         Ptr{Data.TTF_Font}(C_NULL), 0.0, 0.0, zeros(100), 1, 1, 100)
 end
 
-function advance_trajectory_scene!(d, dt_val::Float64)
+@inline @fastmath function advance_trajectory_scene!(d, dt_val::Float64)
     dt = Float32(dt_val)
-    for i in 1:d.num_balls
+    @inbounds @fastmath for i in 1:d.num_balls
         x = d.ball_x[i] + d.ball_vx[i] * dt
         y = d.ball_y[i] + d.ball_vy[i] * dt
         if x < d.ball_radius
@@ -476,7 +537,7 @@ end
     DESolution.PREV_TRACKED_BALL[] = best_hit_id
 end
 
-function evaluate_trajectory_accuracy(aim!, dt_val::Float64; mode=nothing, newton_iters::Int=1, total_time::Float64=2.0)
+@inline @fastmath function evaluate_trajectory_accuracy(aim!::F, dt_val::Float64; mode=nothing, newton_iters::Int=1, total_time::Float64=2.0) where {F}
     steps = round(Int, total_time / dt_val)
     d_sim = make_trajectory_scene(dt_val)
     d_ref = make_trajectory_scene(dt_val)
@@ -585,7 +646,7 @@ end
 
 function run_all_benchmarks()
     println("=================================================================")
-    println("    OPTIMIZED BILLIARD - BENCHMARK SUITE (1,000,000 RUNS)        ")
+    println("    OPTIMIZED BILLIARD - BENCHMARK SUITE (10,000,000 RUNS)       ")
     println("=================================================================")
 
     colors = Dict(
@@ -612,31 +673,28 @@ function run_all_benchmarks()
         "DE (RK4)"      => Float64[]
     )
 
+    println("  | Balls | Method        | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10% (ns) | Worst 10% (ns) |")
+    println("  |------:|:--------------|----------:|------------:|-------------:|--------------:|---------------:|")
     for n in ball_counts
         data = create_data(Int32(n); blocked=true)
 
-        t_simple = benchmark_func(SimpleSolution.aim_cue!, data, Int32(1))
-        push!(scaling_data["Simple"], t_simple)
-
-        t_homo = benchmark_func(HomotopySolution.aim_cue!, data, Int32(1))
-        push!(scaling_data["Homotopy"], t_homo)
-
-        t_de_const = benchmark_func(DEConstantSolution.aim_cue!, data, Int32(1))
-        push!(scaling_data["DE (Constant)"], t_de_const)
-
-        t_de_euler = benchmark_func(DEEulerSolution.aim_cue!, data, Int32(1))
-        push!(scaling_data["DE (Euler)"], t_de_euler)
-
-        t_de_rk4 = benchmark_func(DERK4Solution.aim_cue!, data, Int32(1))
-        push!(scaling_data["DE (RK4)"], t_de_rk4)
-
-        @printf("  N=%2d -> Simple: %6.1f | 0th: %6.1f | Euler: %6.1f | RK4: %6.1f | Homotopy: %6.1f ns\n",
-                n, t_simple, t_de_const, t_de_euler, t_de_rk4, t_homo)
+        for (m_name, f!) in (
+            ("Simple",        SimpleSolution.aim_cue!),
+            ("DE (Constant)", DEConstantSolution.aim_cue!),
+            ("DE (Euler)",    DEEulerSolution.aim_cue!),
+            ("DE (RK4)",      DERK4Solution.aim_cue!),
+            ("Homotopy",      HomotopySolution.aim_cue!)
+        )
+            st = benchmark_stats(f!, data, Int32(1))
+            push!(scaling_data[m_name], st.mean)
+            @printf("  | %5d | %-13s | %9.1f | %11.1f | %12.1f | %13.1f | %14.1f |\n",
+                    n, m_name, st.mean, st.median, st.std, st.best10, st.worst10)
+        end
     end
 
     out_scaling = joinpath(dir, "results_ball_scaling.svg")
     PlotUtils.plot_line(
-        "Execution Time vs. Number of Balls (1M Runs)",
+        "Execution Time vs. Number of Balls (10M Runs)",
         "Number of Balls on Table",
         "Latency (ns / simulated update)",
         ball_counts,
@@ -658,48 +716,34 @@ function run_all_benchmarks()
         "Homotopy"      => zeros(Float64, length(categories))
     )
 
-    # Scenario 1: Clear LOS (16 balls, unobstructed initial configuration)
     d_clear = create_data(Int32(16); blocked=false)
-    scenario_data["Simple"][1] = benchmark_func(SimpleSolution.aim_cue!, d_clear, Int32(1))
-    scenario_data["DE (Constant)"][1] = benchmark_func(DEConstantSolution.aim_cue!, d_clear, Int32(1))
-    scenario_data["DE (Euler)"][1] = benchmark_func(DEEulerSolution.aim_cue!, d_clear, Int32(1))
-    scenario_data["DE (RK4)"][1] = benchmark_func(DERK4Solution.aim_cue!, d_clear, Int32(1))
-    scenario_data["Homotopy"][1] = benchmark_func(HomotopySolution.aim_cue!, d_clear, Int32(1))
-
-    # Scenario 2: Blocked LOS (16 balls, stationary target line with crossing blocker)
     d_blocked = create_data(Int32(16); blocked=true)
     d_blocked.ball_vx[1] = 0.0f0
     d_blocked.ball_vy[1] = 0.0f0
-    scenario_data["Simple"][2] = benchmark_func(SimpleSolution.aim_cue!, d_blocked, Int32(1))
-    scenario_data["DE (Constant)"][2] = benchmark_func(DEConstantSolution.aim_cue!, d_blocked, Int32(1))
-    scenario_data["DE (Euler)"][2] = benchmark_func(DEEulerSolution.aim_cue!, d_blocked, Int32(1))
-    scenario_data["DE (RK4)"][2] = benchmark_func(DERK4Solution.aim_cue!, d_blocked, Int32(1))
-    scenario_data["Homotopy"][2] = benchmark_func(HomotopySolution.aim_cue!, d_blocked, Int32(1))
-
-    # Scenario 3: Dense Field (32 balls)
     d_dense = create_data(Int32(32); blocked=true)
-    scenario_data["Simple"][3] = benchmark_func(SimpleSolution.aim_cue!, d_dense, Int32(1))
-    scenario_data["DE (Constant)"][3] = benchmark_func(DEConstantSolution.aim_cue!, d_dense, Int32(1))
-    scenario_data["DE (Euler)"][3] = benchmark_func(DEEulerSolution.aim_cue!, d_dense, Int32(1))
-    scenario_data["DE (RK4)"][3] = benchmark_func(DERK4Solution.aim_cue!, d_dense, Int32(1))
-    scenario_data["Homotopy"][3] = benchmark_func(HomotopySolution.aim_cue!, d_dense, Int32(1))
-
-    # Scenario 4: Moving LOS under the same per-update physics step
     d_moving = create_data(Int32(16); blocked=true)
-    scenario_data["Simple"][4] = benchmark_func(SimpleSolution.aim_cue!, d_moving, Int32(1))
-    scenario_data["DE (Constant)"][4] = benchmark_func(DEConstantSolution.aim_cue!, d_moving, Int32(1))
-    scenario_data["DE (Euler)"][4] = benchmark_func(DEEulerSolution.aim_cue!, d_moving, Int32(1))
-    scenario_data["DE (RK4)"][4] = benchmark_func(DERK4Solution.aim_cue!, d_moving, Int32(1))
-    scenario_data["Homotopy"][4] = benchmark_func(HomotopySolution.aim_cue!, d_moving, Int32(1))
+    scenario_objs = [d_clear, d_blocked, d_dense, d_moving]
 
-    for (c_idx, cat) in enumerate(categories)
-        @printf("  Scenario '%-18s' -> Simple: %6.1f | 0th: %6.1f | Euler: %6.1f | RK4: %6.1f | Homotopy: %6.1f ns\n",
-                cat, scenario_data["Simple"][c_idx], scenario_data["DE (Constant)"][c_idx], scenario_data["DE (Euler)"][c_idx], scenario_data["DE (RK4)"][c_idx], scenario_data["Homotopy"][c_idx])
+    println("  | Scenario         | Method        | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10% (ns) | Worst 10% (ns) |")
+    println("  |:-----------------|:--------------|----------:|------------:|-------------:|--------------:|---------------:|")
+    for (c_idx, (cat, d_scen)) in enumerate(zip(categories, scenario_objs))
+        for (m_name, f!) in (
+            ("Simple",        SimpleSolution.aim_cue!),
+            ("DE (Constant)", DEConstantSolution.aim_cue!),
+            ("DE (Euler)",    DEEulerSolution.aim_cue!),
+            ("DE (RK4)",      DERK4Solution.aim_cue!),
+            ("Homotopy",      HomotopySolution.aim_cue!)
+        )
+            st = benchmark_stats(f!, d_scen, Int32(1))
+            scenario_data[m_name][c_idx] = st.mean
+            @printf("  | %-16s | %-13s | %9.1f | %11.1f | %12.1f | %13.1f | %14.1f |\n",
+                    cat, m_name, st.mean, st.median, st.std, st.best10, st.worst10)
+        end
     end
 
     out_scenarios = joinpath(dir, "results_scenarios.svg")
     PlotUtils.plot_grouped_bar(
-        "Latency Across Operational Scenarios (1M Runs)",
+        "Latency Across Operational Scenarios (10M Runs)",
         "Latency (ns / simulated update)",
         categories,
         series_names,
@@ -713,24 +757,24 @@ function run_all_benchmarks()
     # -------------------------------------------------------------------------
     println("\n[3/6] Generating simulated-update latency summary (REPETITIONS = $(REPETITIONS))...")
     d_std = create_data(Int32(16); blocked=true)
-    t_simp = benchmark_func(SimpleSolution.aim_cue!, d_std, Int32(1))
-    t_dec  = benchmark_func(DEConstantSolution.aim_cue!, d_std, Int32(1))
-    t_dee  = benchmark_func(DEEulerSolution.aim_cue!, d_std, Int32(1))
-    t_derk = benchmark_func(DERK4Solution.aim_cue!, d_std, Int32(1))
-    t_hom  = benchmark_func(HomotopySolution.aim_cue!, d_std, Int32(1))
+    st_simp = benchmark_stats(SimpleSolution.aim_cue!, d_std, Int32(1))
+    st_dec  = benchmark_stats(DEConstantSolution.aim_cue!, d_std, Int32(1))
+    st_dee  = benchmark_stats(DEEulerSolution.aim_cue!, d_std, Int32(1))
+    st_derk = benchmark_stats(DERK4Solution.aim_cue!, d_std, Int32(1))
+    st_hom  = benchmark_stats(HomotopySolution.aim_cue!, d_std, Int32(1))
 
-    summary_cats = ["Standard 16 Balls"]
+    summary_cats = ["Mean", "Median", "Best 10%", "Worst 10%"]
     summary_data = Dict{String, Vector{Float64}}(
-        "Simple"        => [t_simp],
-        "DE (Constant)" => [t_dec],
-        "DE (Euler)"    => [t_dee],
-        "DE (RK4)"      => [t_derk],
-        "Homotopy"      => [t_hom]
+        "Simple"        => [st_simp.mean, st_simp.median, st_simp.best10, st_simp.worst10],
+        "DE (Constant)" => [st_dec.mean,  st_dec.median,  st_dec.best10,  st_dec.worst10],
+        "DE (Euler)"    => [st_dee.mean,  st_dee.median,  st_dee.best10,  st_dee.worst10],
+        "DE (RK4)"      => [st_derk.mean, st_derk.median, st_derk.best10, st_derk.worst10],
+        "Homotopy"      => [st_hom.mean,  st_hom.median,  st_hom.best10,  st_hom.worst10]
     )
 
     out_summary = joinpath(dir, "results_summary.svg")
     PlotUtils.plot_grouped_bar(
-        "Simulated Update Latency (16-Ball Scene, 1M Runs)",
+        "Simulated Update Latency Distribution (16-Ball Scene, 10M Runs)",
         "Latency (ns / update)",
         summary_cats,
         series_names,
@@ -739,22 +783,27 @@ function run_all_benchmarks()
         out_summary
     )
 
-    println("\n-----------------------------------------------------------------")
-    println("SIMULATED UPDATE LATENCY (aim + ball physics; rendering excluded):")
-    println("-----------------------------------------------------------------")
-    @printf("| Solution         | Update (ns) | Relative latency |\n")
-    @printf("|:-----------------|------------:|-----------------:|\n")
-    @printf("| Simple           | %11.1f | %16.2fx |\n", t_simp, t_simp / t_simp)
-    @printf("| DE (Constant)    | %11.1f | %16.2fx |\n", t_dec,  t_dec / t_simp)
-    @printf("| DE (Euler)       | %11.1f | %16.2fx |\n", t_dee,  t_dee / t_simp)
-    @printf("| DE (RK4)         | %11.1f | %16.2fx |\n", t_derk, t_derk / t_simp)
-    @printf("| Homotopy         | %11.1f | %16.2fx |\n", t_hom,  t_hom / t_simp)
-    println("-----------------------------------------------------------------")
+    println("\n------------------------------------------------------------------------------------------------------")
+    println("SIMULATED UPDATE LATENCY DISTRIBUTION (16-Ball Scene, 10M Runs; rendering excluded):")
+    println("------------------------------------------------------------------------------------------------------")
+    @printf("| Solution         | Mean (ns) | Median (ns) | Std Dev (ns) | Best 10%% (ns) | Worst 10%% (ns) | Relative |\n")
+    @printf("|:-----------------|----------:|------------:|-------------:|--------------:|---------------:|---------:|\n")
+    for (m_name, st) in (
+        ("Simple",        st_simp),
+        ("DE (Constant)", st_dec),
+        ("DE (Euler)",    st_dee),
+        ("DE (RK4)",      st_derk),
+        ("Homotopy",      st_hom)
+    )
+        @printf("| %-16s | %9.1f | %11.1f | %12.1f | %13.1f | %14.1f | %7.2fx |\n",
+                m_name, st.mean, st.median, st.std, st.best10, st.worst10, st.mean / st_simp.mean)
+    end
+    println("------------------------------------------------------------------------------------------------------")
 
     # -------------------------------------------------------------------------
     # Experiment 4: Central Loop Fast-Path Frequency & Branch Breakdown
     # -------------------------------------------------------------------------
-    println("\n[4/6] Analyzing central loop fast-path hit rates across 1,000,000 updates...")
+    println("\n[4/6] Analyzing central loop fast-path hit rates across 10,000,000 updates...")
     fp_series = ["DE (Constant)", "DE (Euler)", "DE (RK4)"]
     fp_plot_data = Dict{String, Vector{Float64}}(
         "DE (Constant)" => zeros(Float64, length(categories)),
@@ -764,11 +813,11 @@ function run_all_benchmarks()
     scenario_objs = [d_clear, d_blocked, d_dense, d_moving]
 
     for (s_idx, (cat, d_scen)) in enumerate(zip(categories, scenario_objs))
-        println("  --- Scenario: $cat (1,000,000 frames) ---")
+        println("  --- Scenario: $cat (10,000,000 frames) ---")
         for (m_name, m_sym) in (("DE (Constant)", :zero_order), ("DE (Euler)", :euler), ("DE (RK4)", :rk4))
             st = analyze_fastpath_and_loop(d_scen, Int32(1), m_sym; reps=REPETITIONS)
             fp_plot_data[m_name][s_idx] = st.fast_hit_rate_eligible
-            @printf("    %-14s | Eligible: %7d (%5.1f%%) | Fast-Path Taken: %7d (%6.2f%% of eligible, %5.2f%% total) | Loop Cont: %6d (Conv: %6d, Fallback: %5d)\n",
+            @printf("    %-14s | Eligible: %8d (%5.1f%%) | Fast-Path Taken: %8d (%6.2f%% of eligible, %5.2f%% total) | Loop Cont: %7d (Conv: %7d, Fallback: %6d)\n",
                     m_name, st.fast_eligible, 100.0 * st.fast_eligible / st.reps,
                     st.fast_taken, st.fast_hit_rate_eligible, st.fast_hit_rate_all,
                     st.loop_cont_calls, st.loop_cont_conv, st.loop_fallback)
@@ -777,7 +826,7 @@ function run_all_benchmarks()
 
     out_fastpath = joinpath(dir, "results_fastpath.svg")
     PlotUtils.plot_grouped_bar(
-        "Fast-Path Hit Rate (% of Blocked Frames, 1M Runs)",
+        "Fast-Path Hit Rate (% of Blocked Frames, 10M Runs)",
         "Fast-Path Hit Rate (%)",
         categories,
         fp_series,

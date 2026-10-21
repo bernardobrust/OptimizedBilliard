@@ -57,7 +57,7 @@ export aim_cue!
 # - The resulting (collision_x, collision_y) is exported to data for rendering.
 # =============================================================================
 
-@inline function aim_cue!(data, sid::Int32)
+@inline @fastmath function aim_cue!(data, sid::Int32)
     # Cue pivot / ray origin Q = (qx, qy)
     qx = data.cue_x
     qy = data.cue_y

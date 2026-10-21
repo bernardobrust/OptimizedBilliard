@@ -66,9 +66,9 @@ const PREDICTOR_MODE = Ref{Symbol}(:zero_order) # :zero_order, :euler, or :rk4
 const PREV_DELTA_X = Ref{Float64}(0.0)
 const PREV_DELTA_Y = Ref{Float64}(0.0)
 const ALGORITHMIC_DT = Ref{Float64}(1.0 / 120.0)
-set_algorithmic_dt!(dt::Real) = (ALGORITHMIC_DT[] = Float64(dt))
+@inline set_algorithmic_dt!(dt::Real) = (ALGORITHMIC_DT[] = Float64(dt))
 
-function set_predictor_mode!(mode::Symbol)
+@inline function set_predictor_mode!(mode::Symbol)
     if mode in (:rk4, :zero_order, :euler)
         PREDICTOR_MODE[] = mode
     else
@@ -89,7 +89,7 @@ end
     return newton_step(x_pred, p_next, n_next, c_next, rad)
 end
 
-function get_predictor_mode()::Symbol
+@inline function get_predictor_mode()::Symbol
     return PREDICTOR_MODE[]
 end
 

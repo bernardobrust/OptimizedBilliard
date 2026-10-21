@@ -100,7 +100,7 @@ end
 end
 
 # Gradient of the line polynomial f2 with respect to (x, y): (∂f2/∂x, ∂f2/∂y) = (e, f)
-@inline function dh2dx_fast(p::NTuple{7, Float64})
+@inline @fastmath function dh2dx_fast(p::NTuple{7, Float64})
     return (p[5], p[6])
 end
 
@@ -126,7 +126,7 @@ end
 # Partial derivative of H with respect to continuation parameter t:
 # Because H is linear in the parameter vector p(t) = (1 - t)*pi + t*pf,
 # ∂H/∂t = fn(x, pf - pi) (holding x fixed).
-@inline function Ht_fast(x::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
+@inline @fastmath function Ht_fast(x::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     dp = ntuple(i -> pf[i] - pi[i], 7)
     return fn_fast(x, dp)
 end
@@ -188,7 +188,7 @@ end
 
 # Newton-Raphson corrector step for error reduction:
 # x_new = x - Hx(x, t)^(-1) * H(x, t) (up to 2 iterations with early exit when ||dx||² < 1e-4)
-@inline function newton_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
+@inline @fastmath function newton_step_fast(ic::Tuple{Float64, Float64}, t::Float64, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     x = ic
 
     @inbounds @fastmath for _ in 1:2
@@ -209,7 +209,7 @@ end
 
 
 # Adaptive step-size homotopy path tracker from t = 0 (start root `ic` of `pi`) to t = 1 (target `pf`).
-@inline function track_fast(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
+@inline @fastmath function track_fast(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64})
     thresh_sq = 1.9^2
     t = 0.0
     dt = 0.1
@@ -253,7 +253,7 @@ end
     return newton_step_fast(curr, 1.0, pi, pf)
 end
 
-@inline track(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}) = track_fast(ic, pi, pf)
+@inline @fastmath track(ic::Tuple{Float64, Float64}, pi::NTuple{7, Float64}, pf::NTuple{7, Float64}) = track_fast(ic, pi, pf)
 
 
 # Integration with the system
